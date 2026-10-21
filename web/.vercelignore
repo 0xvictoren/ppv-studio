@@ -1,0 +1,7 @@
+# Not needed on Vercel (videos live in R2, metadata in Atlas)
+data
+.mock-data
+.smoke-data
+.next-mock
+assets
+scripts/fixtures

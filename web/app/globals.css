@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  PayPerWatch design tokens (HSL channels).
+  One hue family: cream (primary) and a deeper caramel derived from it (secondary).
+  Light and dark share the same primary so actions never change colour between themes.
+  Every text/background pair below is >= 4.5:1.
+*/
+@layer base {
+  :root,
+  .light {
+    --background: 0 0% 100%;          /* #FFFFFF */
+    --surface: 40 33% 98%;            /* #FCFAF6 */
+    --muted: 40 28% 95%;              /* #F6F2EB */
+    --foreground: 36 12% 10%;         /* #1C1A17 */
+    --muted-foreground: 36 6% 38%;    /* #67625A */
+    --border: 38 22% 88%;             /* #E8E1D5 */
+    --primary: 40 46% 85%;            /* cream #EDE1C8 */
+    --primary-hover: 40 42% 80%;
+    --primary-border: 38 30% 72%;
+    --primary-foreground: 36 12% 10%;
+    --secondary: 34 40% 32%;          /* caramel #72552F */
+    --tint: 40 48% 95%;               /* cream wash for selected/highlighted surfaces */
+    --ring: 34 40% 32%;
+    --destructive: 2 60% 44%;
+    --overlay: 36 12% 6%;
+    color-scheme: light;
+  }
+  .dark {
+    --background: 36 10% 6%;          /* #110F0D */
+    --surface: 36 9% 9%;              /* #191714 */
+    --muted: 36 8% 13%;               /* #23211D */
+    --foreground: 40 30% 92%;         /* #F0EBE1 */
+    --muted-foreground: 38 10% 64%;   /* #A8A296 */
+    --border: 36 8% 18%;              /* #302D28 */
+    --primary: 40 46% 85%;
+    --primary-hover: 40 50% 90%;
+    --primary-border: 38 22% 42%;
+    --primary-foreground: 36 12% 10%;
+    --secondary: 38 48% 74%;          /* light caramel #DCC59C */
+    --tint: 38 16% 13%;               /* warm lift, not grey */
+    --ring: 40 46% 85%;
+    --destructive: 4 70% 68%;
+    --overlay: 36 12% 4%;
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-size: 15px;
+    line-height: 1.55;
+    letter-spacing: -0.005em;
+    font-feature-settings: "tnum" 0;
+  }
+  /* Colours glide between themes instead of snapping. */
+  body,
+  header,
+  footer,
+  .surface-t {
+    transition: background-color 280ms cubic-bezier(0.4, 0, 0.2, 1), color 280ms cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display), var(--font-text), -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.022em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Quiet entrance used by <Reveal>. Transform + opacity only. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1), transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 70ms);
+  }
+  .reveal[data-shown="true"] {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+/* Includes the centring translate so the dialog never jumps. */
+@keyframes dialogIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
