@@ -47,21 +47,21 @@ short-lived signed links.
    Secret Access Key and your Account ID into `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_ACCOUNT_ID`. Set `R2_BUCKET`.
 3. Bucket → *Settings → CORS policy*: paste this, replacing the origins with your URLs:
    ```json
-   [{ "AllowedOrigins": ["https://YOUR-APP.vercel.app", "http://localhost:3000"],
+   [{ "AllowedOrigins": ["https://ppv-studio.vercel.app", "http://localhost:3000"],
       "AllowedMethods": ["GET", "PUT", "HEAD"], "AllowedHeaders": ["content-type", "range"],
       "ExposeHeaders": ["content-length", "content-range", "etag"], "MaxAgeSeconds": 3600 }]
    ```
 
 **3. Vercel**
-1. Import the repo, with the project root set to `web`.
+1. Import the repo (the Next.js app is at the repo root).
 2. Environment variables: everything from `.env.local` (`NEXT_PUBLIC_ARC_*`, `NEXT_PUBLIC_PPW_*`,
    `SESSION_SECRET`, `CRON_SECRET`, `SETTLER_PRIVATE_KEY`), plus `MONGODB_URI`, `MONGODB_DB`, `R2_*`,
-   `NEXT_PUBLIC_STORAGE_PROVIDER=r2` and `NEXT_PUBLIC_APP_URL=https://YOUR-APP.vercel.app`.
+   `NEXT_PUBLIC_STORAGE_PROVIDER=r2` and `NEXT_PUBLIC_APP_URL=https://ppv-studio.vercel.app`.
 3. Deploy. If the URL changes, update `NEXT_PUBLIC_APP_URL` and redeploy, because it's baked in at build time.
 
 **4. Hourly payouts.** Vercel Hobby only allows daily cron jobs (`vercel.json`). Milestone settlements
 (10/25/50/75/100%) happen on their own while people watch. For the hourly sweep, create a free job at cron-job.org:
-`GET https://YOUR-APP.vercel.app/api/cron/settle`, every hour, with header `Authorization: Bearer <CRON_SECRET>`.
+`GET https://ppv-studio.vercel.app/api/cron/settle`, every hour, with header `Authorization: Bearer <CRON_SECRET>`.
 
 **5. Move this PC's videos and data up (once):** with the Atlas and R2 values in `.env.local`, run
 `npx tsx scripts/migrate-to-cloud.ts` (dry run) and then `--apply`. It uploads `data/uploads` to R2, copies all
