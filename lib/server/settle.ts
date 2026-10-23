@@ -81,9 +81,27 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
     // Unreferred receipts first: a referrer only earns once their own payment to the creator has settled.
     due.sort((a, b) => Number(a.r.referrer !== ZERO_ADDRESS) - Number(b.r.referrer !== ZERO_ADDRESS));
 
-    for (let i = 0; i < due.length; i += BATCH_SIZE) {
-      const chunk = due.slice(i, i + BATCH_SIZE);
-      const { hash, skipped } = await submitSettleBatch(chunk.map((d) => d.r), chunk.map((d) => d.sig));
+    // A batch that can't go through at all (one receipt's smart-contract wallet burning all the gas
+    // reverts the whole tx) must not hold up everyone else's payout: retry its receipts one by one.
+    const chunks: (typeof due)[] = [];
+    for (let i = 0; i < due.length; i += BATCH_SIZE) chunks.push(due.slice(i, i + BATCH_SIZE));
+    while (chunks.length) {
+      const chunk = chunks.shift()!;
+      let result: Awaited<ReturnType<typeof submitSettleBatch>>;
+      try {
+        result = await submitSettleBatch(chunk.map((d) => d.r), chunk.map((d) => d.sig));
+      } catch (e) {
+        if (chunk.length > 1) {
+          console.error(`[settle] settleBatch(${chunk.length}) failed, retrying one by one:`, e instanceof Error ? e.message.split("\n")[0] : e);
+          chunks.unshift(...chunk.map((d) => [d]));
+        } else {
+          const d = chunk[0];
+          console.error(`[settle] couldn't settle ${d.r.viewer} -> ${d.r.creator} (${d.delta} units):`, e instanceof Error ? e.message.split("\n")[0] : e);
+          skippedCount++;
+        }
+        continue;
+      }
+      const { hash, skipped } = result;
       console.log(`[settle] settleBatch(${chunk.length}) tx ${hash}${skipped.length ? `, ${skipped.length} skipped` : ""}`);
       txHashes.push(hash);
       for (const s of skipped) {

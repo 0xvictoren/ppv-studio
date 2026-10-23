@@ -32,7 +32,7 @@ export const REFERRAL_LABEL = `${Number(REFERRAL_BPS) / 100}%`;
 // Must match the contract's EIP-712 domain exactly.
 export const eip712Domain = {
   name: "PayPerWatch",
-  version: "3",
+  version: "4",
   chainId: env.chainId,
   verifyingContract: PPW_ADDRESS,
 } as const;
@@ -64,7 +64,7 @@ export type PpwWriteFn =
   | "withdraw"
   | "cancelWithdraw";
 
-export type PpwReadFn = "videos" | "balanceOf" | "settled" | "paidTo" | "pendingWithdrawal" | "sessionKeys" | "feeBps";
+export type PpwReadFn = "videos" | "balanceOf" | "settled" | "paidTo" | "pendingWithdrawal" | "sessionKeys" | "feeBps" | "feesAccrued" | "WITHDRAW_DELAY";
 
 /** JSON-safe event as served by /api/events (bigints are strings). */
 export type PpwEvent = {

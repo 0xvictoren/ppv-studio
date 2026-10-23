@@ -1,4 +1,6 @@
 import { isMock } from "@/lib/env";
+import { ONE_USDC } from "@/lib/money";
+import { withdrawPlatformFees } from "@/lib/server/chain";
 import { error, json } from "@/lib/server/http";
 import { runSettlement } from "@/lib/server/settle";
 
@@ -17,7 +19,12 @@ function authorized(req: Request) {
 async function handle(req: Request) {
   if (!authorized(req)) return error("Unauthorized", 401);
   const result = await runSettlement();
-  return json(result, { status: result.status === "error" ? 500 : 200 });
+  // Fees accrue in the contract (v4); sweep them to the fee recipient once there's at least $1.
+  const feesTx = await withdrawPlatformFees(ONE_USDC).catch((e) => {
+    console.error("[settle] fee withdrawal failed:", e instanceof Error ? e.message.split("\n")[0] : e);
+    return null;
+  });
+  return json({ ...result, feesTx }, { status: result.status === "error" ? 500 : 200 });
 }
 
 export const GET = handle;

@@ -1,11 +1,21 @@
 {
-  "current": "v3",
+  "current": "v4",
   "arcTestnet": {
     "chainId": 5042002,
     "rpc": "https://rpc.testnet.arc.io",
     "explorer": "https://explorer.testnet.arc.io",
     "usdc": "0x3600000000000000000000000000000000000000",
     "PayPerWatch": {
+      "v4": {
+        "address": "0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1",
+        "deployTx": "0x4856ff537448a970b289120b7a03834a7579afc400ea13b22aafd58af0dd88fc",
+        "deployBlock": 68679534,
+        "eip712Version": "4",
+        "feeBps": 500,
+        "referralBps": 500,
+        "withdrawDelaySeconds": 86400,
+        "owner": "0x85a5f7C46C86DD219757ec381dfDf2bB72Fa8c98"
+      },
       "v3": {
         "address": "0xfff200a3921d18ae09616901a1aaf9434ce693e7",
         "deployTx": "0xc0c42b940b43a07e2ceec70f9a5ea549c057a47312d9d157e28189059afb05f8",

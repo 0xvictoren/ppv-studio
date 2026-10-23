@@ -198,7 +198,7 @@ function WithdrawCard({ address }: { address: Address }) {
       <CardHeader>
         <CardTitle>Withdraw unused funds</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Withdrawals are ready 1 hour after you request them. That gives the hourly settlement time to bill your final
+          Withdrawals are ready 24 hours after you request them. That gives settlement time to bill your final
           minutes, and you&apos;re never charged for anything you didn&apos;t watch.
         </p>
       </CardHeader>

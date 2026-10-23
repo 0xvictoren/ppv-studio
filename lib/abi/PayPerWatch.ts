@@ -1,4 +1,4 @@
-// PayPerWatch v3 ABI (referrals, owner-adjustable referral rate) — generated from contracts/abi/PayPerWatch.json.
+// PayPerWatch v4 ABI (fee timelock, pull-based platform fees, adjustable withdraw delay) — generated from contracts/abi/PayPerWatch.json.
 // To update: replace the array with the new ABI JSON and keep the `as const`.
 export const ppwAbi = [
   {
@@ -29,6 +29,19 @@ export const ppwAbi = [
   },
   {
     "type": "function",
+    "name": "BATCH_GAS_OVERHEAD",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "DOMAIN_SEPARATOR",
     "inputs": [],
     "outputs": [
@@ -36,6 +49,32 @@ export const ppwAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "FEE_TIMELOCK",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "GAS_PER_ENTRY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -55,6 +94,19 @@ export const ppwAbi = [
   },
   {
     "type": "function",
+    "name": "MAX_COMBINED_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_REFERRAL_BPS",
     "inputs": [],
     "outputs": [
@@ -62,6 +114,32 @@ export const ppwAbi = [
         "name": "",
         "type": "uint16",
         "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_WITHDRAW_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_WITHDRAW_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -127,6 +205,20 @@ export const ppwAbi = [
   {
     "type": "function",
     "name": "acceptOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "applyFee",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "applyReferralBps",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -292,6 +384,19 @@ export const ppwAbi = [
   },
   {
     "type": "function",
+    "name": "feesAccrued",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getVideo",
     "inputs": [
       {
@@ -431,6 +536,32 @@ export const ppwAbi = [
   },
   {
     "type": "function",
+    "name": "pendingFeeApplicableAt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingFeeBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "pendingOwner",
     "inputs": [],
     "outputs": [
@@ -438,6 +569,32 @@ export const ppwAbi = [
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingReferralApplicableAt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingReferralBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "stateMutability": "view"
@@ -465,6 +622,32 @@ export const ppwAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proposeFee",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "proposeReferralBps",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -616,6 +799,19 @@ export const ppwAbi = [
         "name": "active",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setWithdrawDelay",
+    "inputs": [
+      {
+        "name": "delay",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "outputs": [],
@@ -828,6 +1024,13 @@ export const ppwAbi = [
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "withdrawFees",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "Deposited",
     "inputs": [
@@ -854,6 +1057,25 @@ export const ppwAbi = [
   },
   {
     "type": "event",
+    "name": "FeeProposed",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
+        "name": "applicableAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "FeeUpdated",
     "inputs": [
       {
@@ -861,6 +1083,25 @@ export const ppwAbi = [
         "type": "uint16",
         "indexed": false,
         "internalType": "uint16"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeesWithdrawn",
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -962,6 +1203,25 @@ export const ppwAbi = [
         "type": "uint128",
         "indexed": false,
         "internalType": "uint128"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ReferralBpsProposed",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
+        "name": "applicableAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
@@ -1169,6 +1429,19 @@ export const ppwAbi = [
   },
   {
     "type": "event",
+    "name": "WithdrawDelayUpdated",
+    "inputs": [
+      {
+        "name": "newDelay",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "WithdrawRequested",
     "inputs": [
       {
@@ -1213,6 +1486,16 @@ export const ppwAbi = [
   },
   {
     "type": "error",
+    "name": "CombinedFeeTooHigh",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DelayOutOfRange",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "EnforcedPause",
     "inputs": []
   },
@@ -1229,6 +1512,11 @@ export const ppwAbi = [
   {
     "type": "error",
     "name": "InsufficientBalance",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientGasForBatch",
     "inputs": []
   },
   {
@@ -1277,6 +1565,11 @@ export const ppwAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "PendingProposalExists",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1340,6 +1633,11 @@ export const ppwAbi = [
         "internalType": "string"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "TimelockNotExpired",
+    "inputs": []
   },
   {
     "type": "error",

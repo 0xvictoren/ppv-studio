@@ -15,6 +15,8 @@ type State = {
   block: bigint;
   feeBps: bigint;
   feeRecipient: Address;
+  /** v4: platform fees accrue here and are pulled with withdrawFees(). */
+  feesAccrued: bigint;
   videos: Map<Hex, Video>;
   balanceOf: Map<Address, bigint>;
   settled: Map<string, bigint>; // viewer:creator:referrer
@@ -27,7 +29,7 @@ type State = {
 };
 
 const FAUCET = 50n * ONE_USDC;
-export const WITHDRAW_DELAY = 3600n;
+export const WITHDRAW_DELAY = 86_400n; // v4 default: 24 hours
 
 const g = globalThis as unknown as { __ppwMock?: State };
 function state(): State {
@@ -36,6 +38,7 @@ function state(): State {
       block: 1n,
       feeBps: 500n,
       feeRecipient: "0x000000000000000000000000000000000000fEE0",
+      feesAccrued: 0n,
       videos: new Map(),
       balanceOf: new Map(),
       settled: new Map(),
@@ -104,6 +107,10 @@ export function read(fn: string, args: unknown[]): unknown {
     }
     case "feeBps":
       return s.feeBps;
+    case "feesAccrued":
+      return s.feesAccrued;
+    case "WITHDRAW_DELAY":
+      return WITHDRAW_DELAY;
     case "usdc.balanceOf":
       return usdcOf(s, addr(args[0]));
     case "usdc.allowance":
@@ -122,7 +129,9 @@ export function write(fn: string, args: unknown[], fromRaw: string): Hex {
 
   const authorize = (key: Address, expiry: bigint, cap: bigint) => {
     if (expiry <= now()) throw new MockRevert("SessionKeyExpired");
-    s.sessionKeys.set(pair(from, key), { expiry, spendCap: cap, spent: 0n });
+    // v4: re-authorizing a key keeps what it already spent, so a re-auth can't reset the cap.
+    const spent = s.sessionKeys.get(pair(from, key))?.spent ?? 0n;
+    s.sessionKeys.set(pair(from, key), { expiry, spendCap: cap, spent });
     emit(s, tx, "SessionKeyAuthorized", { viewer: from, key, expiry, spendCap: cap });
   };
   const deposit = (amount: bigint) => {
@@ -207,6 +216,14 @@ export function write(fn: string, args: unknown[], fromRaw: string): Hex {
       emit(s, tx, "Withdrawn", { viewer: from, amount: pay });
       break;
     }
+    case "withdrawFees": {
+      if (s.feesAccrued === 0n) throw new MockRevert("InvalidAmount");
+      const amount = s.feesAccrued;
+      s.feesAccrued = 0n;
+      s.usdc.set(s.feeRecipient, usdcOf(s, s.feeRecipient) + amount);
+      emit(s, tx, "FeesWithdrawn", { recipient: s.feeRecipient, amount });
+      break;
+    }
     case "cancelWithdraw":
       s.pendingWithdrawal.delete(from);
       emit(s, tx, "WithdrawCancelled", { viewer: from });
@@ -217,7 +234,7 @@ export function write(fn: string, args: unknown[], fromRaw: string): Hex {
   return tx.hash;
 }
 
-/** Demo-only: make a pending withdrawal claimable now instead of waiting an hour. */
+/** Demo-only: make a pending withdrawal claimable now instead of waiting a day. */
 export function fastForwardWithdrawal(viewer: string) {
   const w = state().pendingWithdrawal.get(addr(viewer));
   if (w) w.availableAt = now();
@@ -277,7 +294,7 @@ async function settleOne(s: State, tx: { hash: Hex; block: bigint }, r: Receipt,
   s.paidTo.set(pair(viewer, creator), (s.paidTo.get(pair(viewer, creator)) ?? 0n) + delta);
   s.balanceOf.set(viewer, bal - delta);
   s.usdc.set(creator, usdcOf(s, creator) + delta - fee - referralAmount);
-  s.usdc.set(s.feeRecipient, usdcOf(s, s.feeRecipient) + fee);
+  s.feesAccrued += fee;
   if (referralAmount > 0n) s.usdc.set(referrer, usdcOf(s, referrer) + referralAmount);
   emit(s, tx, "Settled", { viewer, creator, referrer, delta, fee, referralAmount, cumulativeAmount: r.cumulativeAmount });
 }

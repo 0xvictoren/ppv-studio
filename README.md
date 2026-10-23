@@ -5,7 +5,7 @@ Arc. Creators upload, choose a category and set a price per hour. Viewers connec
 watch with no popups. Receipts are settled onchain every hour, and any site can embed it with one line.
 
 Runs on **Arc Testnet** against the deployed contract
-[`0xfff2…93e7`](https://explorer.testnet.arc.io/address/0xfff200a3921d18ae09616901a1aaf9434ce693e7) (v3).
+[`0x9da4…96e1`](https://explorer.testnet.arc.io/address/0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1) (v4).
 
 ## Run it for real people (self-hosted, no third-party accounts)
 

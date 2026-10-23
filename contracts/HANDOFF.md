@@ -2,17 +2,25 @@
 
 ## Deployed Contracts
 
-### v3 (CURRENT — use this)
+### v4 (CURRENT — use this)
+| Field | Value |
+|---|---|
+| **Contract address** | `0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1` |
+| **Network** | Arc Testnet |
+| **Chain ID** | `5042002` |
+| **Deploy block** | `68679534` |
+| **Deploy tx hash** | `0x4856ff537448a970b289120b7a03834a7579afc400ea13b22aafd58af0dd88fc` |
+| **Explorer** | https://explorer.testnet.arc.io/address/0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1 |
+| **feeBps at deploy** | `500` (5%) |
+| **referralBps at deploy** | `500` (5% default, timelocked, owner-adjustable 0–10%) |
+| **withdrawDelay at deploy** | `86400` (24 hours, owner-adjustable 1h–7d) |
+| **feeRecipient / owner** | `0x85a5f7C46C86DD219757ec381dfDf2bB72Fa8c98` |
+
+### v3 (superseded)
 | Field | Value |
 |---|---|
 | **Contract address** | `0xfff200a3921d18ae09616901a1aaf9434ce693e7` |
-| **Network** | Arc Testnet |
-| **Chain ID** | `5042002` |
 | **Deploy tx hash** | `0xc0c42b940b43a07e2ceec70f9a5ea549c057a47312d9d157e28189059afb05f8` |
-| **Explorer** | https://explorer.testnet.arc.io/address/0xfff200a3921d18ae09616901a1aaf9434ce693e7 |
-| **feeBps at deploy** | `500` (5%) |
-| **referralBps at deploy** | `500` (5% default, owner-adjustable 0–10% via `setReferralBps`) |
-| **feeRecipient / owner** | `0x85a5f7C46C86DD219757ec381dfDf2bB72Fa8c98` |
 
 ### v2 (superseded)
 | Field | Value |
@@ -52,20 +60,20 @@
 
 ---
 
-## EIP-712 Domain (v3)
+## EIP-712 Domain (v4)
 
 ```typescript
 const domain = {
   name: "PayPerWatch",
-  version: "3",                                               // bumped from v2
+  version: "4",                                               // bumped from v3
   chainId: 5042002,                                          // 5042 for mainnet
-  verifyingContract: "0xfff200a3921d18ae09616901a1aaf9434ce693e7",
+  verifyingContract: "0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1",
 } as const;
 ```
 
 ---
 
-## Receipt Type (v3 — includes referrer)
+## Receipt Type (v4 — unchanged from v3)
 
 ```typescript
 const types = {
@@ -87,9 +95,9 @@ import { signTypedData } from "viem/accounts";
 const signature = await walletClient.signTypedData({
   domain: {
     name: "PayPerWatch",
-    version: "3",
+    version: "4",
     chainId: 5042002n,
-    verifyingContract: "0xfff200a3921d18ae09616901a1aaf9434ce693e7",
+    verifyingContract: "0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1",
   },
   types: {
     Receipt: [
@@ -115,7 +123,7 @@ const signature = await walletClient.signTypedData({
 
 ---
 
-## Key Storage Getters (v3)
+## Key Storage Getters (v4)
 
 ```solidity
 // Cumulative settled for a specific (viewer, creator, referrer) lane
@@ -124,13 +132,30 @@ settled(address viewer, address creator, address referrer) returns (uint256)
 // Total settled by viewer to creator across ALL referrer lanes
 paidTo(address viewer, address creator) returns (uint256)
 
-// Referral rate — owner-adjustable, 0–10%; default 5%
-referralBps() returns (uint16)         // 500 at deploy (5%)
-MAX_REFERRAL_BPS() returns (uint16)    // 1000 (ceiling, constant)
-setReferralBps(uint16 bps)             // onlyOwner; reverts ReferralTooHigh if bps > 1000
+// Referral rate — owner-adjustable via 48h timelock; default 5%
+referralBps() returns (uint16)              // 500 at deploy (5%)
+MAX_REFERRAL_BPS() returns (uint16)         // 1000 (ceiling, constant)
+MAX_COMBINED_BPS() returns (uint16)         // 1500 — feeBps + referralBps <= 1500
+proposeReferralBps(uint16 bps)              // onlyOwner; queues change, applies after 48h
+setReferralBps(uint16 bps)                  // backward-compat alias for proposeReferralBps
+applyReferralBps()                          // callable by anyone after timelock expires
 
-// Platform fee — configurable by owner (max 10%)
-feeBps() returns (uint16)              // 500 at deploy (5%)
+// Platform fee — owner-adjustable via 48h timelock; default 5%
+feeBps() returns (uint16)                   // 500 at deploy (5%)
+proposeFee(uint16 bps)                      // onlyOwner; queues change, applies after 48h
+setFee(uint16 bps)                          // backward-compat alias for proposeFee
+applyFee()                                  // callable by anyone after timelock expires
+
+// Fee recipient
+feeRecipient() returns (address)            // set immediately (no timelock)
+
+// Accrued platform fees (pull payment)
+feesAccrued() returns (uint256)             // USDC waiting to be pulled
+withdrawFees()                              // callable by anyone; sends feesAccrued to feeRecipient
+
+// Withdraw delay — owner-adjustable, default 24h, bounds [1h, 7d]
+WITHDRAW_DELAY() returns (uint64)           // current delay in seconds
+setWithdrawDelay(uint64 delay)              // onlyOwner
 ```
 
 ---
@@ -138,12 +163,14 @@ feeBps() returns (uint16)              // 500 at deploy (5%)
 ## Settlement Split (per actualDelta)
 
 ```
-fee             = actualDelta * feeBps / 10_000
-referralAmount  = validReferral ? actualDelta * referralBps / 10_000 : 0
-creatorAmount   = actualDelta - fee - referralAmount
+fee             = actualDelta * feeBps / 10_000        // accrued in feesAccrued; pull via withdrawFees()
+referralAmount  = validReferral ? actualDelta * referralBps / 10_000 : 0   // pushed to r.referrer
+creatorAmount   = actualDelta - fee - referralAmount   // pushed to r.creator
 ```
 
-`referralBps` defaults to 500 (5%) and is owner-adjustable from 0 to 1000.
+`feeBps + referralBps <= 1500` is enforced at proposal time (combined 15% max). Integer division truncates toward zero; any remainder goes to the creator.
+
+`referralBps` defaults to 500 (5%) and is owner-adjustable 0–1000 via 48h timelock.
 
 Referral is **valid** iff:
 - `referrer != address(0)`
