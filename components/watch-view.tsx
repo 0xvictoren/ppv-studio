@@ -138,14 +138,15 @@ export function WatchView({ id, embedded, backHref, refParam }: { id: string; em
   const streamQ = useQuery({
     queryKey: ["stream", id, viewer, keyActive, passActive],
     enabled: isLocal && !!viewer && (keyActive || passActive),
-    // Links last 15 minutes (/api/stream); renew before they expire. The player keeps its position.
-    staleTime: 12 * 60 * 1000,
-    refetchInterval: 12 * 60 * 1000,
+    // Renew before the link expires (15 minutes for whole files, 3 hours for encrypted HLS, whose
+    // segment keys are gated separately). The player keeps its position across renewals.
+    staleTime: (q) => ((q.state.data?.expiresIn ?? 900) * 1000 * 4) / 5,
+    refetchInterval: (q) => ((q.state.data?.expiresIn ?? 900) * 1000 * 4) / 5,
     refetchIntervalInBackground: true,
     queryFn: async () =>
-      (await api<{ url: string }>("/api/stream", { method: "POST", json: { viewer, videoId: id }, headers: await viewerAuthHeaders(viewer, authKey) })).url,
+      api<{ url: string; expiresIn: number | null }>("/api/stream", { method: "POST", json: { viewer, videoId: id }, headers: await viewerAuthHeaders(viewer, authKey) }),
   });
-  const playerSrc = isLocal ? (streamQ.data ?? null) : (video?.playback_url ?? null);
+  const playerSrc = isLocal ? (streamQ.data?.url ?? null) : (video?.playback_url ?? null);
 
   const sessionBudget = budgetFor(meter.ready ? meter.cumulative - meter.sessionCost : 0n);
   const remaining = max0(sessionBudget - meter.sessionCost);

@@ -220,3 +220,126 @@ export async function agentTotalForCreator(creator: string): Promise<bigint> {
     : local().purchases.filter((p) => p.creator === lc(creator));
   return rows.reduce((a, r) => a + BigInt(r.amount), 0n);
 }
+
+// ------------------------------------------------------------------ encrypted HLS
+
+export type HlsSegment = { name: string; duration: number };
+
+/** A video packaged as AES-128 HLS by the worker. Each segment has its own key, derived from `key`. */
+export type HlsRow = {
+  /** content_cid */
+  id: string;
+  /** 32-byte master key (hex). Never sent to viewers; segment keys are derived from it. */
+  key: string;
+  storage: "r2" | "local";
+  status: "packaging" | "ready";
+  segments: HlsSegment[];
+  target_duration: number;
+  created_at: string;
+};
+
+/** Which segment keys a viewer has been given for a video, and when (ms). */
+export type HlsGrantRow = { id: string; viewer: string; video_id: string; grants: Record<string, number> };
+
+/** Receipts the contract keeps refusing, so settlement backs off instead of retrying every hour. */
+export type SettleSkipRow = { id: string; count: number; last_at: string; reason: string };
+
+type Extra = { hls: Map<string, HlsRow>; grants: Map<string, HlsGrantRow>; skips: Map<string, SettleSkipRow> };
+const gx = globalThis as unknown as { __ppwContentExtra?: Extra };
+const EXTRA_FILE = path.join(DATA_DIR, "ppw-content-extra.json");
+
+function extra(): Extra {
+  if (!gx.__ppwContentExtra) {
+    const m: Extra = { hls: new Map(), grants: new Map(), skips: new Map() };
+    if (!isMock && existsSync(EXTRA_FILE)) {
+      const raw = JSON.parse(readFileSync(EXTRA_FILE, "utf8")) as { hls?: HlsRow[]; grants?: HlsGrantRow[]; skips?: SettleSkipRow[] };
+      raw.hls?.forEach((r) => m.hls.set(r.id, r));
+      raw.grants?.forEach((r) => m.grants.set(r.id, r));
+      raw.skips?.forEach((r) => m.skips.set(r.id, r));
+    }
+    gx.__ppwContentExtra = m;
+  }
+  return gx.__ppwContentExtra;
+}
+
+function saveExtra() {
+  if (isMock) return;
+  const m = extra();
+  mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = `${EXTRA_FILE}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ hls: [...m.hls.values()], grants: [...m.grants.values()], skips: [...m.skips.values()] }));
+  renameSync(tmp, EXTRA_FILE);
+}
+
+export async function getHls(id: string): Promise<HlsRow | null> {
+  if (mongoEnabled()) return clean<HlsRow>(await (await col<WithId<HlsRow>>("hls")).findOne({ _id: id }));
+  return extra().hls.get(id) ?? null;
+}
+
+export async function listHlsIds(): Promise<{ id: string; status: HlsRow["status"] }[]> {
+  if (mongoEnabled()) {
+    const docs = await (await col<WithId<HlsRow>>("hls")).find({}, { projection: { _id: 1, status: 1 } }).toArray();
+    return docs.map((d) => ({ id: d._id, status: d.status }));
+  }
+  return [...extra().hls.values()].map((r) => ({ id: r.id, status: r.status }));
+}
+
+export async function putHls(row: HlsRow): Promise<void> {
+  if (mongoEnabled()) {
+    await (await col<WithId<HlsRow>>("hls")).replaceOne({ _id: row.id }, { ...row }, { upsert: true });
+    return;
+  }
+  extra().hls.set(row.id, row);
+  saveExtra();
+}
+
+export async function getHlsGrants(viewer: string, videoId: string): Promise<HlsGrantRow | null> {
+  const id = `${lc(viewer)}:${lc(videoId)}`;
+  if (mongoEnabled()) return clean<HlsGrantRow>(await (await col<WithId<HlsGrantRow>>("hls_grants")).findOne({ _id: id }));
+  return extra().grants.get(id) ?? null;
+}
+
+/** Record that segment `seg` was handed to this viewer (first grant time is kept). */
+export async function addHlsGrant(viewer: string, videoId: string, seg: number, at: number): Promise<void> {
+  const id = `${lc(viewer)}:${lc(videoId)}`;
+  if (mongoEnabled()) {
+    await (await col<WithId<HlsGrantRow>>("hls_grants")).updateOne(
+      { _id: id, [`grants.${seg}`]: { $exists: false } },
+      { $set: { viewer: lc(viewer), video_id: lc(videoId), [`grants.${seg}`]: at } },
+      { upsert: true },
+    ).catch((e: { code?: number }) => {
+      if (e.code !== 11000) throw e; // already granted (the filter didn't match an existing doc)
+    });
+    return;
+  }
+  const m = extra();
+  const row = m.grants.get(id) ?? { id, viewer: lc(viewer), video_id: lc(videoId), grants: {} };
+  row.grants[String(seg)] ??= at;
+  m.grants.set(id, row);
+  saveExtra();
+}
+
+export async function listSettleSkips(): Promise<SettleSkipRow[]> {
+  if (mongoEnabled()) return (await (await col<WithId<SettleSkipRow>>("settle_skips")).find({}).toArray()).map((d) => ({ ...clean<SettleSkipRow>(d)!, id: d._id }));
+  return [...extra().skips.values()];
+}
+
+export async function recordSettleSkip(id: string, reason: string): Promise<void> {
+  const now = nowIso();
+  if (mongoEnabled()) {
+    await (await col<WithId<SettleSkipRow>>("settle_skips")).updateOne({ _id: id }, { $inc: { count: 1 }, $set: { last_at: now, reason } }, { upsert: true });
+    return;
+  }
+  const m = extra();
+  const row = m.skips.get(id) ?? { id, count: 0, last_at: now, reason };
+  m.skips.set(id, { ...row, count: row.count + 1, last_at: now, reason });
+  saveExtra();
+}
+
+export async function clearSettleSkip(id: string): Promise<void> {
+  if (mongoEnabled()) {
+    await (await col<WithId<SettleSkipRow>>("settle_skips")).deleteOne({ _id: id });
+    return;
+  }
+  if (extra().skips.delete(id)) saveExtra();
+}

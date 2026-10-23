@@ -5,6 +5,8 @@ import type { Address } from "viem";
 import type { PpwEvent } from "../contract";
 import { api } from "./api";
 import { readPpw, usdcBalance } from "./ppw";
+import { currentSessionKey } from "./session-key";
+import { viewerAuthHeaders } from "./viewer-auth";
 
 export type VideoDTO = {
   id: string;
@@ -68,8 +70,12 @@ export function useEscrow(address: Address | undefined) {
         readPpw<bigint>("balanceOf", [address]),
         usdcBalance(address!),
         readPpw<readonly [bigint, bigint]>("pendingWithdrawal", [address]),
-        api<{ pendingTotal: string; receipts: { creator: string; referrer: string; pending: string; cumulative_amount: string }[] }>(
-          `/api/receipts?viewer=${address}`,
+        // The per-receipt list is private: prove we're this viewer with the browser's session key.
+        viewerAuthHeaders(address, currentSessionKey(address!)).then((headers) =>
+          api<{ pendingTotal: string; receipts: { creator: string; referrer: string; pending: string; cumulative_amount: string }[] }>(
+            `/api/receipts?viewer=${address}`,
+            { headers },
+          ),
         ),
       ]);
       const unsettled = BigInt(receipts.pendingTotal);

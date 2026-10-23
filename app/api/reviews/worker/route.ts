@@ -1,22 +1,28 @@
 import { getVideo, listVideos, updateVideo } from "@/lib/server/db";
+import { randomBytes } from "node:crypto";
 import {
+  getHls,
   getReview,
+  listHlsIds,
   listIndexIds,
   listQueuedReviews,
   patchReview,
+  putHls,
   putIndexEntry,
   type ReviewMatch,
   type TranscriptSegment,
 } from "@/lib/server/content-db";
 import { error, json } from "@/lib/server/http";
+import { storageRef } from "@/lib/server/media";
 import { workerAuthorized, workerDownloadUrl } from "@/lib/server/review";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET (worker) -> { jobs, backfill, published }.
+ * GET (worker) -> { jobs, backfill, package, published }.
  * jobs: uploads waiting for their originality check. backfill: published videos that were never
- * indexed (uploaded before the check existed). published: index entries to compare against.
+ * indexed (uploaded before the check existed). package: published videos to encrypt as HLS, with
+ * their master key. published: index entries to compare against.
  */
 export async function GET(req: Request) {
   if (!workerAuthorized(req)) return error("Unauthorized", 401);
@@ -46,8 +52,23 @@ export async function GET(req: Request) {
         downloadUrl: await workerDownloadUrl(v, origin),
       })),
   );
-  return json({ jobs, backfill, published: ids.filter((i) => i.video_id) });
+  // Encrypted HLS for published videos in private storage. A packaging attempt that never finished
+  // (worker stopped) is handed out again after a while, with the same key.
+  const hlsIds = new Map((await listHlsIds()).map((h) => [h.id, h.status]));
+  const toPackage = [];
+  for (const v of videos.filter((v) => v.active && storageRef(v).kind !== "remote" && hlsIds.get(v.content_cid) !== "ready")) {
+    if (toPackage.length >= 2) break;
+    let row = await getHls(v.content_cid);
+    if (row && Date.now() - new Date(row.created_at).getTime() < PACKAGING_RETRY_MS) continue;
+    const kind = storageRef(v).kind === "r2" ? "r2" : "local";
+    row = { id: v.content_cid, key: row?.key ?? randomBytes(32).toString("hex"), storage: kind, status: "packaging", segments: [], target_duration: 0, created_at: new Date().toISOString() };
+    await putHls(row);
+    toPackage.push({ id: v.content_cid, videoId: v.id, title: v.title, key: row.key, downloadUrl: await workerDownloadUrl(v, origin) });
+  }
+  return json({ jobs, backfill, package: toPackage, published: ids.filter((i) => i.video_id) });
 }
+
+const PACKAGING_RETRY_MS = 60 * 60 * 1000;
 
 type Entry = { frames: string; audio: string; transcript: string; segments: TranscriptSegment[] };
 type Body =

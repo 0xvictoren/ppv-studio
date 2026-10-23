@@ -5,7 +5,9 @@ import { getReceipt, getVideo, getWatchSession, listReceipts, upsertWatchSession
 import { error, json } from "@/lib/server/http";
 import { applyPaidCoverage } from "@/lib/server/progress";
 import { ReceiptError, verifyAndStoreReceipt, type RawReceipt } from "@/lib/server/receipts";
+import { sessionAddress } from "@/lib/server/session";
 import { requestMilestoneSettlement } from "@/lib/server/settle";
+import { authViewer } from "@/lib/server/viewer-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +75,9 @@ export async function POST(req: Request) {
 
 /**
  * GET ?viewer=&creator=[&referrer=] -> { cumulative, settled } for one lane (the client's starting point)
- * GET ?viewer= | ?creator= | ?referrer= -> receipts + unsettled total
+ * GET ?viewer= | ?creator= | ?referrer= -> unsettled total, plus the receipts themselves (never their
+ *   signatures) only for that viewer (session key or sign-in) or the signed-in creator / referrer.
+ *   Anyone else learns just the total, so who pays whom isn't public.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -97,5 +101,9 @@ export async function GET(req: Request) {
     }),
   );
   const pendingTotal = withSettled.reduce((a, r) => a + BigInt(r.pending), 0n);
-  return json({ receipts: withSettled, pendingTotal: pendingTotal.toString() });
+  const me = await sessionAddress();
+  const own = viewer ? !!(await authViewer(req, viewer)) : me === (creator ?? referrerParam)?.toLowerCase();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const receipts = own ? withSettled.map(({ signature, signer, ...r }) => r) : [];
+  return json({ receipts, pendingTotal: pendingTotal.toString() });
 }

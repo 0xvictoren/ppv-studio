@@ -3,9 +3,13 @@ import { waitUntil } from "@vercel/functions";
 import { getAddress, type Hex } from "viem";
 import { ZERO_ADDRESS, type Receipt } from "../contract";
 import { readPpw, submitSettleBatch } from "./chain";
+import { clearSettleSkip, listSettleSkips, recordSettleSkip } from "./content-db";
 import { insertSettlementRun, listReceipts, setSettledAmount } from "./db";
 
 const BATCH_SIZE = 50;
+/** A receipt the contract refused this many times in a row is retried once a day, not every hour. */
+const SKIP_BACKOFF_AFTER = 3;
+const SKIP_BACKOFF_MS = 24 * 60 * 60 * 1000;
 
 export type SettleResult = { status: "success" | "noop" | "error"; count: number; total: string; txHashes: Hex[]; error?: string };
 
@@ -58,7 +62,14 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
 
   try {
     const wanted = opts.only ? new Set(opts.only.map(tkey)) : null;
-    const rows = (await listReceipts()).filter((r) => !wanted || wanted.has(tkey(r)));
+    // Hourly runs back off receipts the contract keeps refusing (bad signature, expired key...).
+    // Milestone and download settlements always try: a viewer is waiting on those.
+    const skips = new Map((await listSettleSkips()).map((k) => [k.id, k]));
+    const backedOff = (id: string) => {
+      const k = skips.get(id);
+      return !wanted && !!k && k.count >= SKIP_BACKOFF_AFTER && Date.now() - new Date(k.last_at).getTime() < SKIP_BACKOFF_MS;
+    };
+    const rows = (await listReceipts()).filter((r) => (!wanted || wanted.has(tkey(r))) && !backedOff(tkey(r)));
     const due: { r: Receipt; sig: Hex; delta: bigint }[] = [];
     for (const row of rows) {
       const settled = await readPpw<bigint>("settled", [row.viewer, row.creator, row.referrer]);
@@ -96,7 +107,9 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
           chunks.unshift(...chunk.map((d) => [d]));
         } else {
           const d = chunk[0];
-          console.error(`[settle] couldn't settle ${d.r.viewer} -> ${d.r.creator} (${d.delta} units):`, e instanceof Error ? e.message.split("\n")[0] : e);
+          const reason = e instanceof Error ? e.message.split("\n")[0] : String(e);
+          console.error(`[settle] couldn't settle ${d.r.viewer} -> ${d.r.creator} (${d.delta} units):`, reason);
+          await recordSettleSkip(tkey(d.r), reason.slice(0, 200));
           skippedCount++;
         }
         continue;
@@ -107,6 +120,7 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
       for (const s of skipped) {
         const d = chunk[s.index];
         console.error(`[settle] skipped ${d.r.viewer} -> ${d.r.creator} (${d.delta} units), reason ${s.reason}`);
+        await recordSettleSkip(tkey(d.r), s.reason);
         skippedCount++;
       }
       const skippedIdx = new Set(skipped.map((s) => s.index));
@@ -114,6 +128,7 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
         const settled = await readPpw<bigint>("settled", [d.r.viewer, d.r.creator, d.r.referrer]);
         await setSettledAmount(d.r.viewer, d.r.creator, d.r.referrer, settled);
         if (skippedIdx.has(j)) continue;
+        if (skips.has(tkey(d.r))) await clearSettleSkip(tkey(d.r));
         count++;
         total += d.delta;
       }

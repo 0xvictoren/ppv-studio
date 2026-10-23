@@ -11,8 +11,22 @@ const STOP = new Set(
   ),
 );
 
+const MAX_TERMS = 12;
+
 export function terms(q: string): string[] {
-  return [...new Set((q.toLowerCase().match(/[a-z0-9][a-z0-9']+/g) ?? []).filter((w) => w.length > 1 && !STOP.has(w)))];
+  return [...new Set((q.toLowerCase().match(/[a-z0-9][a-z0-9']+/g) ?? []).filter((w) => w.length > 1 && !STOP.has(w)))].slice(0, MAX_TERMS);
+}
+
+// Videos and transcripts change rarely; don't reload every transcript for every free search.
+const CACHE_MS = 60_000;
+const g = globalThis as unknown as { __ppwSearchCorpus?: { at: number; data: Promise<[VideoRow[], Awaited<ReturnType<typeof listTranscripts>>]> } };
+function corpus() {
+  if (!g.__ppwSearchCorpus || Date.now() - g.__ppwSearchCorpus.at > CACHE_MS) {
+    const data = Promise.all([listVideos(), listTranscripts()]);
+    g.__ppwSearchCorpus = { at: Date.now(), data };
+    data.catch(() => (g.__ppwSearchCorpus = undefined));
+  }
+  return g.__ppwSearchCorpus.data;
 }
 
 const count = (text: string, t: string) => text.split(t).length - 1;
@@ -22,7 +36,7 @@ export type SearchHit = { video: VideoRow; score: number; moments: TranscriptSeg
 export async function searchVideos(q: string, limit = 10): Promise<SearchHit[]> {
   const ts = terms(q);
   if (!ts.length) return [];
-  const [videos, transcripts] = await Promise.all([listVideos(), listTranscripts()]);
+  const [videos, transcripts] = await corpus();
   const byVideo = new Map(transcripts.map((t) => [t.video_id, t.segments]));
 
   const hits: SearchHit[] = [];

@@ -51,8 +51,11 @@ export function uploadIsIssued(addr: string, contentId: string, playbackUrl: str
   return !!c && c.kind === "upload-ref" && c.addr === addr.toLowerCase() && c.contentId === contentId && c.playbackUrl === playbackUrl;
 }
 
-/** Access to one local media file for a while: streaming (player) or a one-off download. */
-export type MediaClaim = { kind: "stream" | "download"; file: string; viewer: string; exp: number };
+/**
+ * Access to one media file for a while: streaming (player), a one-off download, or an encrypted
+ * HLS playlist and its segment keys (file = the content id).
+ */
+export type MediaClaim = { kind: "stream" | "download" | "hls"; file: string; viewer: string; exp: number };
 export const signMedia = (claim: MediaClaim) => signClaim(claim);
 export const verifyMedia = (token: string, kind: MediaClaim["kind"]) => {
   const c = verifyClaim<MediaClaim>(token);

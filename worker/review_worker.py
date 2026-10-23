@@ -11,7 +11,11 @@ score under 50 from topic overlap holds the video until the creator explains wha
 It also indexes published videos uploaded before the check existed, and the transcripts it
 produces power transcript search and the paid agent API.
 
-Needs: Python 3.10+, numpy, and an ffmpeg build with --enable-whisper and --enable-chromaprint.
+It also packages published videos as encrypted HLS (each ~6 s segment under its own AES-128
+key), so viewers can only decrypt the seconds they pay for.
+
+Needs: Python 3.10+, numpy, cryptography, and an ffmpeg build with --enable-whisper and
+--enable-chromaprint.
 
   python worker/review_worker.py                       # poll the site in .env.local / PPW_URL
   python worker/review_worker.py --url https://ppv-studio.vercel.app
@@ -19,7 +23,8 @@ Needs: Python 3.10+, numpy, and an ffmpeg build with --enable-whisper and --enab
   python worker/review_worker.py --compare a.mp4 b.mp4 # local test, no server
 
 Env: REVIEW_WORKER_SECRET (required to talk to the site), PPW_URL, WHISPER_MODEL
-(default worker/models/ggml-base.bin), WHISPER_PROCS (parallel transcription, default 4).
+(default worker/models/ggml-base.bin), WHISPER_PROCS (parallel transcription, default 4),
+WHISPER_VAD_MODEL (optional voice activity detection, e.g. worker/models/ggml-silero-v5.1.2.bin).
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ import argparse
 import base64
 import concurrent.futures as cf
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -48,6 +54,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 HERE = Path(__file__).resolve().parent
 CACHE = HERE / "cache"
+# Optional voice activity detection (e.g. worker/models/ggml-silero-v5.1.2.bin): skips silence and
+# music, but ffmpeg's filter is slow with it, so it's opt-in.
+VAD_MODEL = Path(os.environ["WHISPER_VAD_MODEL"]) if os.environ.get("WHISPER_VAD_MODEL") else None
 
 # Thresholds
 FRAME_MATCH_BITS = 10  # frames within this Hamming distance (of 64 bits) are the same picture
@@ -128,8 +137,55 @@ def filter_path(p: Path) -> str:
 NOISE = re.compile(r"^\s*[\(\[\*♪].*[\)\]\*♪]\s*$|^\s*$")
 
 
-def transcribe(path: str, duration: float, model: Path, procs: int) -> list[dict]:
-    """Speech -> [{start, end, text}] (seconds). Splits long audio across parallel whisper runs."""
+def drop_hallucinations(segs: list[dict]) -> list[dict]:
+    """Whisper (especially small models) loops on music and noise, repeating one line over and over.
+    Keep the first of any run of identical lines, and any short line at most three times overall."""
+    norm = lambda t: re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()
+    seen = Counter()
+    out = []
+    for seg in segs:
+        n = norm(seg["text"])
+        if not n or (out and n == norm(out[-1]["text"])):
+            continue
+        seen[n] += 1
+        if len(n) < 60 and seen[n] > 3:
+            continue
+        out.append(seg)
+    return out
+
+
+# Common function words per language. ffmpeg's whisper filter re-detects the language for every
+# 20 s window, and a wrong guess turns plain speech into invented words; counting these over a
+# sample pass picks the video's language so the real pass can fix it for every window.
+STOPWORDS = {
+    "en": "the and is are you that this it to of in for with we what have can be not on was",
+    "es": "el la los las que de y es en un una por con para no se lo como",
+    "fr": "le la les des que et est un une du pour dans pas vous nous ce qui sur",
+    "de": "der die das und ist nicht ich sie es ein eine zu mit auf den dem wir",
+    "pt": "o a os as que de e um uma do da em para com não se por",
+    "it": "il lo la gli le che di e un una per con non si sono della del",
+    "nl": "de het een en van is dat niet op te zijn met voor ik je",
+}
+
+
+def detect_language(segs: list[dict]) -> str:
+    words = re.findall(r"[a-zà-ÿ']+", " ".join(x["text"] for x in segs).lower())
+    counts = Counter()
+    for lang, sw in STOPWORDS.items():
+        vocab = set(sw.split())
+        counts[lang] = sum(1 for w_ in words if w_ in vocab)
+    (best, n), *rest = counts.most_common() or [("auto", 0)]
+    runner_up = rest[0][1] if rest else 0
+    return best if n >= 5 and n >= 2 * runner_up else "auto"
+
+
+def transcribe(path: str, duration: float, model: Path, procs: int, language: str | None = None) -> list[dict]:
+    """Speech -> [{start, end, text}] (seconds). Splits long audio across parallel whisper runs.
+    Without `language`, a short auto-detect pass picks it first (see STOPWORDS)."""
+    if language is None:
+        sample = transcribe(path, min(duration, 90), model, 1, language="auto")
+        language = detect_language(sample)
+        log(f"  language: {language}")
     parts = max(1, min(procs, math.ceil(duration / 120)))
     span = duration / parts
     tmp = tempfile.mkdtemp(prefix="ppw-asr-")
@@ -138,7 +194,8 @@ def transcribe(path: str, duration: float, model: Path, procs: int) -> list[dict
         def one(i: int) -> list[dict]:
             start = i * span
             out = f"part{i}.json"
-            af = f"aresample=16000,whisper=model={filter_path(model)}:language=auto:queue=20:use_gpu=false:destination={out}:format=json"
+            vad = f":vad_model={filter_path(VAD_MODEL)}:vad_threshold=0.5" if VAD_MODEL and VAD_MODEL.exists() else ""
+            af = f"aresample=16000,whisper=model={filter_path(model)}{vad}:language={language}:queue=20:use_gpu=false:destination={out}:format=json"
             run(["ffmpeg", "-v", "error", "-ss", f"{start:.3f}", "-t", f"{span + 0.5:.3f}", "-i", path, "-vn", "-af", af, "-f", "null", "-"], cwd=tmp)
             segs = []
             f = Path(tmp) / out
@@ -156,7 +213,7 @@ def transcribe(path: str, duration: float, model: Path, procs: int) -> list[dict
 
         with cf.ThreadPoolExecutor(parts) as ex:
             chunks = list(ex.map(one, range(parts)))
-        return [s for c in chunks for s in c]
+        return drop_hallucinations([s for c in chunks for s in c])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -355,6 +412,79 @@ def process(site: Site, job: dict, kind: str, published: list[dict], model: Path
     site.call("/api/reviews/worker", body)
 
 
+HLS_SEGMENT_SECONDS = 6
+
+
+def segment_key(master: bytes, i: int) -> bytes:
+    """Must match lib/server/hls.ts segmentKey: HMAC-SHA256(master, "seg:<i>")[:16]."""
+    return hmac.new(master, f"seg:{i}".encode(), hashlib.sha256).digest()[:16]
+
+
+def encrypt_segment(data: bytes, key: bytes, i: int) -> bytes:
+    """HLS AES-128: CBC with PKCS7 padding, IV = segment number (also written in the playlist)."""
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(data) + padder.finalize()
+    enc = Cipher(algorithms.AES(key), modes.CBC(i.to_bytes(16, "big"))).encryptor()
+    return enc.update(padded) + enc.finalize()
+
+
+def put(site: Site, url: str, data: bytes):
+    # Our own server needs the worker secret; presigned storage URLs must not get an auth header.
+    headers = {"content-type": "video/mp2t"} | ({"authorization": f"Bearer {site.secret}"} if url.startswith(site.url) else {})
+    req = urllib.request.Request(url, data=data, headers=headers, method="PUT")
+    with urllib.request.urlopen(req, timeout=300) as r:
+        r.read()
+
+
+def package(site: Site, job: dict):
+    """Encrypted HLS for one published video: ~6 s segments, each under its own AES-128 key."""
+    log(f"packaging {job['title']!r}")
+    tmp = tempfile.mkdtemp(prefix="ppw-hls-")
+    try:
+        src = os.path.join(tmp, "video")
+        download(job["downloadUrl"], src)
+        streams = json.loads(run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,codec_name", "-of", "json", src])).get("streams", [])
+        vcodec = next((x.get("codec_name") for x in streams if x.get("codec_type") == "video"), None)
+        acodec = next((x.get("codec_name") for x in streams if x.get("codec_type") == "audio"), None)
+        if not vcodec:
+            raise ValueError("no video stream")
+        # Browsers' HLS needs H.264 + AAC: copy when it already is, otherwise transcode.
+        v_args = ["-c:v", "copy"] if vcodec == "h264" else ["-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p"]
+        a_args = [] if not acodec else (["-c:a", "copy"] if acodec == "aac" else ["-c:a", "aac", "-b:a", "128k"])
+        out = Path(tmp) / "hls"
+        out.mkdir()
+        run(["ffmpeg", "-v", "error", "-i", src, "-map", "0:v:0", *(["-map", "0:a:0"] if acodec else []), *v_args, *a_args,
+             "-f", "hls", "-hls_time", str(HLS_SEGMENT_SECONDS), "-hls_playlist_type", "vod",
+             "-hls_segment_filename", "seg%05d.ts", "index.m3u8"], cwd=str(out))
+        segments, duration = [], None
+        for line in (out / "index.m3u8").read_text(encoding="utf8").splitlines():
+            if line.startswith("#EXTINF:"):
+                duration = float(line[8:].split(",")[0])
+            elif line and not line.startswith("#"):
+                segments.append({"name": line.strip(), "duration": round(duration or HLS_SEGMENT_SECONDS, 3)})
+        if not segments:
+            raise ValueError("ffmpeg produced no segments")
+
+        master = bytes.fromhex(job["key"])
+        targets = site.call("/api/reviews/worker/hls", {"id": job["id"], "files": [x["name"] for x in segments]})["targets"]
+
+        def upload(i: int):
+            name = segments[i]["name"]
+            put(site, targets[name], encrypt_segment((out / name).read_bytes(), segment_key(master, i), i))
+
+        with cf.ThreadPoolExecutor(6) as ex:
+            list(ex.map(upload, range(len(segments))))
+        site.call("/api/reviews/worker/hls", {"id": job["id"], "done": True, "segments": segments})
+        log(f"  -> {len(segments)} encrypted segments")
+    except Exception as e:  # leave it; the site hands the job out again later
+        log(f"  packaging failed: {e}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def loop(site: Site, model: Path, procs: int, once: bool):
     if not model.exists():
         log(f"warning: whisper model not found at {model}; transcripts (topic check, agent API) will be empty")
@@ -372,6 +502,12 @@ def loop(site: Site, model: Path, procs: int, once: bool):
                 for job in state["jobs"]:
                     process(site, job, "review", published, model, procs)
                 continue  # look for more right away
+            # Reviews first; then encrypt published videos for paid streaming.
+            if state.get("package"):
+                for job in state["package"]:
+                    package(site, job)
+                if not once:
+                    continue
         except urllib.error.HTTPError as e:
             log(f"site error {e.code}: {e.read()[:200]!r}")
             if e.code == 401:

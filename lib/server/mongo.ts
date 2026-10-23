@@ -22,6 +22,7 @@ async function connect(): Promise<Db> {
     db.collection("reviews").createIndexes([{ key: { status: 1 } }, { key: { creator: 1 } }]),
     db.collection("media_index").createIndexes([{ key: { video_id: 1 } }]),
     db.collection("agent_purchases").createIndexes([{ key: { creator: 1 } }]),
+    db.collection("hls_grants").createIndexes([{ key: { viewer: 1 } }]),
   ]);
   return db;
 }
@@ -35,7 +36,7 @@ export async function mongo(): Promise<Db> {
 }
 
 export async function col<T extends Document>(
-  name: "videos" | "receipts" | "watch_sessions" | "watch_progress" | "settlement_runs" | "reviews" | "media_index" | "agent_purchases",
+  name: "videos" | "receipts" | "watch_sessions" | "watch_progress" | "settlement_runs" | "reviews" | "media_index" | "agent_purchases" | "hls" | "hls_grants" | "settle_skips",
 ): Promise<Collection<T>> {
   return (await mongo()).collection<T>(name);
 }

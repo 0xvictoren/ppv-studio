@@ -33,8 +33,11 @@ export const Player = forwardRef<
     };
     v.addEventListener("loadedmetadata", restore, { once: true });
     let hls: Hls | null = null;
-    if (src.endsWith(".m3u8") && !v.canPlayType("application/vnd.apple.mpegurl") && Hls.isSupported()) {
-      hls = new Hls();
+    // Encrypted streams come from /api/hls/<id>/index.m3u8?t=..., so look at the path, not the query.
+    const isHls = new URL(src, window.location.href).pathname.endsWith(".m3u8");
+    if (isHls && !v.canPlayType("application/vnd.apple.mpegurl") && Hls.isSupported()) {
+      // A modest buffer: each segment's key is only handed out a little ahead of payment.
+      hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 45 });
       hls.loadSource(src);
       hls.attachMedia(v);
     } else {
