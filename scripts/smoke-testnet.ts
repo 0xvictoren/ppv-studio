@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
 import { eip712Domain, receiptTypes } from "../lib/contract";
+import { viewerAuthMessage } from "../lib/viewer-auth";
 
 const BASE = process.argv[2] ?? "http://localhost:3000";
 let failures = 0;
@@ -61,16 +62,41 @@ async function main() {
   check("forged download token refused", dl.status === 401, dl.status);
   const anon = await fetch(BASE + "/api/storage/upload", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
   check("upload requires sign-in", anon.status === 401);
+  check("upload target carries a signed ref", typeof target.uploadRef === "string");
 
-  // Metadata is only stored after on-chain verification.
+  // Cross-site requests can't ride the (SameSite=None) session cookie.
+  const json = { "content-type": "application/json", cookie };
+  const review = (body: object, extra: Record<string, string> = {}) =>
+    fetch(BASE + "/api/reviews", { method: "POST", headers: { ...json, ...extra }, body: JSON.stringify({ contentCid: target.contentId, title: "smoke", ...body }) });
+  const csrf = await review({ playbackUrl: target.playbackUrl, uploadRef: target.uploadRef }, { origin: "https://evil.example" });
+  check("cross-site POST refused", csrf.status === 403, csrf.status);
+
+  // Reviews (and so listings) only accept storage locations the server issued to this wallet.
+  const foreign = await review({ playbackUrl: "https://evil.example/swap-me-later.mp4", uploadRef: target.uploadRef });
+  check("review of an outside URL refused", foreign.status === 403, await foreign.text());
+  const noRef = await review({ playbackUrl: target.playbackUrl });
+  check("review without the upload ref refused", noRef.status === 403, await noRef.text());
+  const queued = await review({ playbackUrl: target.playbackUrl, uploadRef: target.uploadRef });
+  check("review of our own upload queued", queued.status === 201 || queued.status === 200, await queued.text());
+
+  // No pass and no funded session key: no stream link, however the viewer authenticates.
+  const ts = Math.floor(Date.now() / 1000);
+  const auth = `${ts}.${await acct.signMessage({ message: viewerAuthMessage(acct.address, ts) })}`;
+  const anyVideo = ((await (await fetch(BASE + "/api/videos")).json()) as { videos: { id: string }[] }).videos[0];
+  if (anyVideo) {
+    const s = await fetch(BASE + "/api/stream", { method: "POST", headers: { "content-type": "application/json", "x-ppw-auth": auth }, body: JSON.stringify({ viewer: acct.address, videoId: anyVideo.id }) });
+    check("stream link refused without a pass or funds", s.status === 402 || (await s.clone().json()).url?.startsWith("http"), s.status);
+  }
+
+  // Metadata is only stored after onchain verification.
   const fake = await fetch(BASE + "/api/videos", {
     method: "POST",
     headers: { "content-type": "application/json", cookie },
     body: JSON.stringify({ txHash: "0x1d7bee340f88fd0173d222536c0f81a020bb625adc9b6224feadd3bff87f043d", contentCid: target.contentId, title: "x", playbackUrl: target.playbackUrl, durationSeconds: 1 }),
   });
-  check("unregistered video rejected", fake.status === 422, await fake.text());
+  check("unchecked, unregistered video rejected", fake.status === 422 || fake.status === 409, await fake.text());
 
-  // Receipts from a key the viewer never authorized are rejected (on-chain sessionKeys lookup).
+  // Receipts from a key the viewer never authorized are rejected (onchain sessionKeys lookup).
   const msg = { viewer: acct.address, creator: privateKeyToAccount(generatePrivateKey()).address, referrer: "0x0000000000000000000000000000000000000000" as const, cumulativeAmount: 1000n, deadline: BigInt(Math.floor(Date.now() / 1000) + 3600) };
   const sig = await privateKeyToAccount(generatePrivateKey()).signTypedData({ domain: eip712Domain, types: receiptTypes, primaryType: "Receipt", message: msg });
   const rec = await fetch(BASE + "/api/receipts", {

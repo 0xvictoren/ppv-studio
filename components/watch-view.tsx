@@ -63,7 +63,7 @@ export function WatchView({ id, embedded, backHref, refParam }: { id: string; em
   const qc = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Session key: local copy + its live on-chain status (expiry, cap, spent).
+  // Session key: local copy + its live onchain status (expiry, cap, spent).
   const [sessionKey, setSessionKey] = useState<StoredSessionKey | null>(null);
   const reloadKey = useCallback(() => setSessionKey(viewer ? currentSessionKey(viewer) : null), [viewer]);
   useEffect(reloadKey, [reloadKey]);
@@ -138,8 +138,10 @@ export function WatchView({ id, embedded, backHref, refParam }: { id: string; em
   const streamQ = useQuery({
     queryKey: ["stream", id, viewer, keyActive, passActive],
     enabled: isLocal && !!viewer && (keyActive || passActive),
-    staleTime: 2 * 60 * 60 * 1000,
-    refetchInterval: 2 * 60 * 60 * 1000,
+    // Links last 15 minutes (/api/stream); renew before they expire. The player keeps its position.
+    staleTime: 12 * 60 * 1000,
+    refetchInterval: 12 * 60 * 1000,
+    refetchIntervalInBackground: true,
     queryFn: async () =>
       (await api<{ url: string }>("/api/stream", { method: "POST", json: { viewer, videoId: id }, headers: await viewerAuthHeaders(viewer, authKey) })).url,
   });
@@ -468,7 +470,7 @@ export function WatchView({ id, embedded, backHref, refParam }: { id: string; em
               <span key={m} className="absolute top-1/2 h-2.5 w-px -translate-y-1/2 bg-border" style={{ left: `${m * 100}%` }} />
             ))}
           </div>
-          <p className="mt-2 text-[12px] text-muted-foreground">Payment settles on-chain at 10%, 25%, 50%, 75% and 100%.</p>
+          <p className="mt-2 text-[12px] text-muted-foreground">Payment settles onchain at 10%, 25%, 50%, 75% and 100%.</p>
         </div>
 
         <p className="mt-5 text-[13px] text-muted-foreground">

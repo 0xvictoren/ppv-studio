@@ -31,7 +31,7 @@ export default function AboutPage() {
           <ul className="mt-3 space-y-2 text-[17px] text-muted-foreground">
             <li>Creators set a price per hour. Viewers deposit a few dollars of USDC into a smart contract.</li>
             <li>Your browser meters real playback and signs a running total with a temporary, spend-capped key. No popups.</li>
-            <li>Every hour the totals are settled on-chain in one batch, and creators are paid directly.</li>
+            <li>Every hour the totals are settled onchain in one batch, and creators are paid directly.</li>
             <li>Unused USDC can always be withdrawn. The one-hour wait only lets your final minutes settle first.</li>
           </ul>
         </section>

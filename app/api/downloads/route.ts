@@ -21,7 +21,7 @@ const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
  * In-app download (saved inside PayPerWatch for offline viewing, like YouTube).
  *  - With an active 30-day pass (watched to the end, or downloaded before): free.
  *  - Otherwise the signed receipt must pay for every second not yet paid for (the rest of the
- *    full-watch price). It's settled on-chain right away, then a 30-day pass is granted.
+ *    full-watch price). It's settled onchain right away, then a 30-day pass is granted.
  * Returns a short-lived link the app streams into its offline library.
  */
 export async function POST(req: Request) {
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       }
       if (receipt.cumulativeAmount - previous < remaining) return error("The payment doesn't cover the rest of this video.", 402);
 
-      // Settle now so the download is paid for on-chain before the file is released.
+      // Settle now so the download is paid for onchain before the file is released.
       const lane = { viewer: receipt.viewer, creator: receipt.creator, referrer: receipt.referrer };
       await runSettlement({ only: [lane] });
       const settled = await readPpw<bigint>("settled", [lane.viewer, lane.creator, lane.referrer]);

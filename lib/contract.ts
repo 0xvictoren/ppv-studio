@@ -25,7 +25,7 @@ export type Receipt = {
 };
 
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
-/** Referrers earn 5% of a referred viewer's spend, paid from the creator's share (on-chain referralBps; owner-adjustable up to 10%). */
+/** Referrers earn 5% of a referred viewer's spend, paid from the creator's share (onchain referralBps; owner-adjustable up to 10%). */
 export const REFERRAL_BPS = 500n;
 export const REFERRAL_LABEL = `${Number(REFERRAL_BPS) / 100}%`;
 

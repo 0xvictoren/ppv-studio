@@ -4,7 +4,7 @@ import type { Address, Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { env } from "../env";
 
-// Browser session keys. Generated locally, authorized on-chain by the viewer, and used to
+// Browser session keys. Generated locally, authorized onchain by the viewer, and used to
 // sign receipts without a wallet popup. Scoped per (chain, contract, viewer).
 
 export type StoredSessionKey = { privateKey: Hex; address: Address; expiry: number; spendCap: string; createdAt: number };
@@ -27,7 +27,7 @@ function save(viewer: string, keys: StoredSessionKey[]) {
   }
 }
 
-/** Newest key that hasn't expired locally. On-chain status is checked separately. */
+/** Newest key that hasn't expired locally. Onchain status is checked separately. */
 export function currentSessionKey(viewer: string): StoredSessionKey | null {
   const now = Date.now() / 1000;
   return listSessionKeys(viewer)
@@ -35,7 +35,7 @@ export function currentSessionKey(viewer: string): StoredSessionKey | null {
     .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null;
 }
 
-/** Create a key (not yet authorized on-chain). Call `rememberSessionKey` once the tx confirms. */
+/** Create a key (not yet authorized onchain). Call `rememberSessionKey` once the tx confirms. */
 export function newSessionKey(spendCap: bigint, ttlSeconds = 24 * 3600): StoredSessionKey {
   const privateKey = generatePrivateKey();
   return {

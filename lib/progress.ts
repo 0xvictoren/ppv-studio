@@ -10,7 +10,7 @@ export const PASS_DAYS = 30;
 export const PASS_MS = PASS_DAYS * 24 * 3600 * 1000;
 /** Allows for skipped credits / last-frame rounding. */
 export const COMPLETE_RATIO = 0.97;
-/** Payment settles on-chain as soon as paid progress crosses each of these. */
+/** Payment settles onchain as soon as paid progress crosses each of these. */
 export const MILESTONES = [0.1, 0.25, 0.5, 0.75, 1] as const;
 
 export function emptyBitmap(durationSeconds: number): Uint8Array {

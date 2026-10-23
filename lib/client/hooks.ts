@@ -44,7 +44,7 @@ export function useVideo(id: string) {
   });
 }
 
-/** Live on-chain video state (price can change after upload). */
+/** Live onchain video state (price can change after upload). */
 export function useOnchainVideo(id: string | undefined) {
   return useQuery({
     queryKey: ["onchain-video", id],

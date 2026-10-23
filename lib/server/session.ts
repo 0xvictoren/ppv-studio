@@ -1,23 +1,21 @@
 import "server-only";
 import { getIronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
+import { sessionSecret } from "./secret";
 
 export type SessionData = { nonce?: string; address?: string; chainId?: number };
 
 // Over https the cookie is SameSite=None so sign-in also works inside embeds on other sites.
+// Cross-site requests are refused by middleware.ts, so that cookie can't be ridden from elsewhere.
 const https = (process.env.NEXT_PUBLIC_APP_URL ?? "").startsWith("https://");
-const options: SessionOptions = {
+const options = (): SessionOptions => ({
   cookieName: "ppw_session",
-  password: process.env.SESSION_SECRET ?? "dev-only-insecure-session-secret-change-me-please",
+  password: sessionSecret(),
   cookieOptions: { secure: https, sameSite: https ? "none" : "lax", httpOnly: true, path: "/" },
-};
-
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
-  console.warn("[ppw] SESSION_SECRET is not set; sessions use an insecure default.");
-}
+});
 
 export function getSession() {
-  return getIronSession<SessionData>(cookies(), options);
+  return getIronSession<SessionData>(cookies(), options());
 }
 
 /** The signed-in wallet (lowercase), or null. */

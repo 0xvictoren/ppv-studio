@@ -280,7 +280,7 @@ export async function insertVideo(v: Omit<VideoRow, "created_at" | "active"> & {
   return row;
 }
 
-export async function updateVideo(id: string, patch: Partial<Pick<VideoRow, "price_per_hour" | "active" | "referrals_enabled">>) {
+export async function updateVideo(id: string, patch: Partial<Pick<VideoRow, "price_per_hour" | "active" | "referrals_enabled" | "duration_seconds">>) {
   if (mongoEnabled()) return mg.patchVideo(id, patch);
   const sb = supabase();
   if (sb) {

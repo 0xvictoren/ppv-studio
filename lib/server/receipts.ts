@@ -15,7 +15,7 @@ export class ReceiptError extends Error {
 
 /**
  * Verify a signed EIP-712 receipt and store it if it raises the cumulative amount.
- * Signer must be the viewer (EOA or EIP-1271) or an unexpired session key authorized on-chain.
+ * Signer must be the viewer (EOA or EIP-1271) or an unexpired session key authorized onchain.
  * Returns the parsed receipt and the cumulative amount that was stored before it.
  */
 export async function verifyAndStoreReceipt(
@@ -55,7 +55,7 @@ export async function verifyAndStoreReceipt(
   }
   if (signer !== receipt.viewer) {
     const ok = await isActiveSessionKey(receipt.viewer, signer);
-    // Smart-contract wallets sign directly; verify via EIP-1271 on-chain.
+    // Smart-contract wallets sign directly; verify via EIP-1271 onchain.
     const ok1271 = !ok && !isMock && (await publicClient.verifyTypedData({ ...typed, address: receipt.viewer, signature }).catch(() => false));
     if (!ok && !ok1271) throw new ReceiptError("Signer isn't the viewer or an active session key", 401);
     if (ok1271) signer = receipt.viewer;

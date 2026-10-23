@@ -12,7 +12,7 @@ create table if not exists videos (
   thumbnail_url    text,
   content_cid      text not null,                  -- IPFS CID or Livepeer playback id
   playback_url     text not null,
-  price_per_hour   numeric(78,0) not null,         -- mirrors chain at registration; the app reads the live price on-chain
+  price_per_hour   numeric(78,0) not null,         -- mirrors chain at registration; the app reads the live price onchain
   duration_seconds integer not null default 0,
   active           boolean not null default true,
   register_tx      text,

@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   if (host && parsed.domain !== host) return error("Sign-in message was for a different site.", 401);
   if (parsed.expirationTime && parsed.expirationTime.getTime() < Date.now()) return error("Sign-in expired. Please try again.", 401);
 
-  // Real mode verifies on-chain too, so smart-contract wallets (EIP-1271) work.
+  // Real mode verifies onchain too, so smart-contract wallets (EIP-1271) work.
   const valid = isMock
     ? await verifyMessage({ address: parsed.address, message, signature })
     : await publicClient.verifySiweMessage({ message, signature, nonce: session.nonce });

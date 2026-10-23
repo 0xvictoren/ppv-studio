@@ -21,7 +21,7 @@ function exclusive<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Settle stored receipts whose cumulativeAmount is above what's settled on-chain: all of them
+ * Settle stored receipts whose cumulativeAmount is above what's settled onchain: all of them
  * (hourly cron), or only the given (viewer, creator, referrer) lanes (milestones, downloads).
  */
 export function runSettlement(opts: { only?: Triple[] } = {}): Promise<SettleResult> {

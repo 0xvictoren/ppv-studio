@@ -1,9 +1,10 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { sessionSecret } from "./secret";
 
 // Short-lived, HMAC-signed claims: upload permission, streaming access, downloads.
 
-const secret = () => process.env.SESSION_SECRET ?? "dev-only-insecure-session-secret-change-me-please";
+const secret = sessionSecret;
 
 export function signClaim<T extends { exp: number }>(claim: T): string {
   const body = Buffer.from(JSON.stringify(claim)).toString("base64url");
@@ -31,6 +32,24 @@ export const verifyUpload = (token: string) => {
   const c = verifyClaim<UploadClaim>(token);
   return c && c.kind === "upload" ? c : null;
 };
+
+/**
+ * Proof that /api/storage/upload issued this storage location to this wallet, so reviews and
+ * listings can't point at a URL the uploader controls (and could swap after the originality check).
+ */
+export type UploadRefClaim = { kind: "upload-ref"; addr: string; contentId: string; playbackUrl: string; exp: number };
+const UPLOAD_REF_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const signUploadRef = (c: Pick<UploadRefClaim, "addr" | "contentId" | "playbackUrl">) =>
+  signClaim<UploadRefClaim>({ ...c, kind: "upload-ref", exp: Date.now() + UPLOAD_REF_TTL_MS });
+
+/** Was this upload's location issued by us to `addr`? IPFS (Pinata) needs no ref: a CID can't be swapped. */
+export function uploadIsIssued(addr: string, contentId: string, playbackUrl: string, ref: unknown): boolean {
+  const gateway = process.env.PINATA_GATEWAY;
+  if (gateway && /^[A-Za-z0-9]{20,100}$/.test(contentId) && playbackUrl === `https://${gateway}/ipfs/${contentId}`) return true;
+  if (typeof ref !== "string") return false;
+  const c = verifyClaim<UploadRefClaim>(ref);
+  return !!c && c.kind === "upload-ref" && c.addr === addr.toLowerCase() && c.contentId === contentId && c.playbackUrl === playbackUrl;
+}
 
 /** Access to one local media file for a while: streaming (player) or a one-off download. */
 export type MediaClaim = { kind: "stream" | "download"; file: string; viewer: string; exp: number };

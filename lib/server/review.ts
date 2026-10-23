@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { isMock } from "../env";
 import type { VideoRow } from "./db";
 import { storageRef } from "./media";
@@ -18,7 +19,9 @@ export function reviewEnabled() {
 /** The worker authenticates with `Authorization: Bearer $REVIEW_WORKER_SECRET`. */
 export function workerAuthorized(req: Request) {
   const secret = process.env.REVIEW_WORKER_SECRET;
-  return !!secret && req.headers.get("authorization") === `Bearer ${secret}`;
+  if (!secret) return false;
+  const digest = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(digest(req.headers.get("authorization") ?? ""), digest(`Bearer ${secret}`));
 }
 
 const WORKER_URL_TTL_S = 6 * 60 * 60;

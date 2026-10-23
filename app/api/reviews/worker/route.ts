@@ -1,4 +1,4 @@
-import { getVideo, listVideos } from "@/lib/server/db";
+import { getVideo, listVideos, updateVideo } from "@/lib/server/db";
 import {
   getReview,
   listIndexIds,
@@ -51,8 +51,11 @@ export async function GET(req: Request) {
 
 type Entry = { frames: string; audio: string; transcript: string; segments: TranscriptSegment[] };
 type Body =
-  | { kind: "review"; id: string; entry?: Entry; result?: { verdict: "passed" | "held" | "blocked"; score: number; matches: ReviewMatch[] }; error?: string }
-  | { kind: "index"; id: string; videoId: string; entry?: Entry; error?: string };
+  | { kind: "review"; id: string; entry?: Entry; duration?: number; result?: { verdict: "passed" | "held" | "blocked"; score: number; matches: ReviewMatch[] }; error?: string }
+  | { kind: "index"; id: string; videoId: string; entry?: Entry; duration?: number; error?: string };
+
+/** The worker's measured length in whole seconds, if it sent a sane one. */
+const measured = (d: unknown) => (typeof d === "number" && d > 0 && d < 7 * 24 * 3600 ? Math.round(d) : null);
 
 const EMPTY: Entry = { frames: "", audio: "", transcript: "", segments: [] };
 
@@ -66,6 +69,9 @@ export async function POST(req: Request) {
     if (!video || video.content_cid !== body.id) return error("Video not found", 404);
     // A video the worker couldn't read gets an empty entry, so it isn't retried forever.
     await putIndexEntry({ id: video.content_cid, creator: video.creator, video_id: video.id, title: video.title, ...(body.entry ?? EMPTY) });
+    // Videos published before the check carry the length their creator typed in; use the real one.
+    const duration = measured(body.duration);
+    if (duration && duration !== video.duration_seconds) await updateVideo(video.id, { duration_seconds: duration });
     return json({ ok: true });
   }
 
@@ -78,7 +84,9 @@ export async function POST(req: Request) {
   const { verdict, score, matches } = body.result;
   if (!["passed", "held", "blocked"].includes(verdict)) return error("Bad verdict");
   await putIndexEntry({ id: review.id, creator: review.creator, video_id: null, title: review.title, ...body.entry });
+  const duration = measured(body.duration);
   await patchReview(review.id, {
+    ...(duration ? { duration_seconds: duration } : {}),
     status: verdict,
     score: Math.max(0, Math.min(100, Math.round(score))),
     matches: matches.slice(0, 5),

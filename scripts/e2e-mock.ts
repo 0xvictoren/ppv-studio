@@ -147,12 +147,12 @@ async function main() {
   const pingBody = await ping.json();
   check("free replay time capped by wall clock", ping.status === 200 && pingBody.freeSeconds > 0 && pingBody.freeSeconds <= 75, pingBody);
 
-  // Milestone settlement: Ben watches 10% of Sintel; it settles on-chain without waiting for the hour.
+  // Milestone settlement: Ben watches 10% of Sintel; it settles onchain without waiting for the hour.
   const sintelCost = costForSeconds(1_000_000n, 90);
   const ms = await post({ ...(await signReceipt(benKey, sintelCost, ben.address)), watch: { sessionId: `e2e-b3-${Date.now()}`, videoId: sintel.id, coverage: bits(888, 0, 90) } });
   check("10% of Sintel paid", ms.status === 200 && ms.body.coveredSeconds === 90, ms.body);
   await sleep(7000);
-  check("settles on-chain at the 10% milestone (no cron)", (await settledOf(ben.address)) === sintelCost, (await settledOf(ben.address)).toString());
+  check("settles onchain at the 10% milestone (no cron)", (await settledOf(ben.address)) === sintelCost, (await settledOf(ben.address)).toString());
 
   // In-app download of Tears of Steel: pays the full price once, then re-downloads are free.
   const dlCost = costForSeconds(2_000_000n, 734);
@@ -166,7 +166,7 @@ async function main() {
   });
   const dlBody = await dl.json();
   check("paid download returns a link + 30-day pass", dl.status === 200 && dlBody.url?.startsWith("/api/downloads/file") && !!dlBody.passUntil, dlBody);
-  check("download settled on-chain before release", (await settledOf(ben.address)) === sintelCost + dlCost);
+  check("download settled onchain before release", (await settledOf(ben.address)) === sintelCost + dlCost);
   const file = await fetch(BASE + dlBody.url);
   check("download link serves the video", file.ok && (file.headers.get("content-type") ?? "").startsWith("video"), file.status);
   await file.body?.cancel();

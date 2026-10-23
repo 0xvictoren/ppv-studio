@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 import { error, json } from "@/lib/server/http";
 import { sessionAddress } from "@/lib/server/session";
 import { presignUpload } from "@/lib/server/r2";
-import { signUpload } from "@/lib/server/upload-token";
+import { signUpload, signUploadRef } from "@/lib/server/upload-token";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,11 @@ const EXTENSIONS: Record<string, string> = {
   "video/x-matroska": "mkv",
   "video/ogg": "ogv",
 };
+
+/** An upload target plus the signed ref that lets /api/reviews and /api/videos trust its location. */
+function issued(me: string, t: { provider: string; uploadUrl: string; contentId: string; playbackUrl: string; contentType?: string }) {
+  return json({ ...t, uploadRef: signUploadRef({ addr: me, contentId: t.contentId, playbackUrl: t.playbackUrl }) });
+}
 
 /**
  * Hands the browser a direct-upload target so video bytes never pass through a JSON API.
@@ -29,7 +34,7 @@ export async function POST(req: Request) {
     const ext = EXTENSIONS[type ?? ""] ?? "mp4";
     const id = randomUUID();
     const token = signUpload({ id, ext, addr: me, exp: Date.now() + 60 * 60 * 1000 });
-    return json({
+    return issued(me, {
       provider: "local",
       uploadUrl: `/api/storage/local?token=${encodeURIComponent(token)}`,
       contentId: `local-${id}`,
@@ -43,7 +48,7 @@ export async function POST(req: Request) {
     const contentType = type && EXTENSIONS[type] ? type : "video/mp4";
     const id = randomUUID();
     const key = `videos/${me}/${id}.${ext}`;
-    return json({
+    return issued(me, {
       provider: "r2",
       uploadUrl: await presignUpload(key, contentType),
       contentType,
@@ -61,7 +66,7 @@ export async function POST(req: Request) {
     const objectPath = `${me}/${randomUUID()}.${ext}`;
     const { data, error: e } = await sb.storage.from("videos").createSignedUploadUrl(objectPath);
     if (e || !data) return error(`Storage error: ${e?.message ?? "no upload URL"}`, 502);
-    return json({
+    return issued(me, {
       provider: "supabase",
       uploadUrl: data.signedUrl,
       contentId: `sb-${objectPath}`,
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
     });
     if (!res.ok) return error(`Livepeer error: ${await res.text()}`, 502);
     const data = (await res.json()) as { url: string; asset: { id: string; playbackId: string } };
-    return json({
+    return issued(me, {
       provider: "livepeer",
       uploadUrl: data.url,
       contentId: data.asset.playbackId,

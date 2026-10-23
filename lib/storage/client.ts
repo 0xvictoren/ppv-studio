@@ -6,10 +6,11 @@ import { SAMPLE_VIDEOS } from "../samples";
 // Storage adapter. The provider (local | r2 | supabase | livepeer | pinata) is chosen server-side by
 // NEXT_PUBLIC_STORAGE_PROVIDER; the browser uploads directly to it.
 
-export type UploadResult = { contentCid: string; playbackUrl: string };
+/** uploadRef: the server's signed proof that it issued this location (see /api/storage/upload). */
+export type UploadResult = { contentCid: string; playbackUrl: string; uploadRef?: string };
 
 type Target =
-  | { provider: "local" | "r2" | "supabase" | "livepeer"; uploadUrl: string; contentId: string; playbackUrl: string; contentType?: string }
+  | { provider: "local" | "r2" | "supabase" | "livepeer"; uploadUrl: string; contentId: string; playbackUrl: string; contentType?: string; uploadRef: string }
   | { provider: "pinata"; uploadUrl: string; gateway: string }
   | { provider: "mock" };
 
@@ -41,7 +42,7 @@ export async function uploadVideo(file: File, onProgress: (pct: number) => void)
   if (target.provider === "local" || target.provider === "r2" || target.provider === "supabase" || target.provider === "livepeer") {
     // R2 signs the Content-Type into the URL, so send exactly the one the server chose.
     await xhr("PUT", target.uploadUrl, file, onProgress, target.contentType ?? (file.type || "video/mp4"));
-    return { contentCid: target.contentId, playbackUrl: target.playbackUrl };
+    return { contentCid: target.contentId, playbackUrl: target.playbackUrl, uploadRef: target.uploadRef };
   }
 
   if (target.provider === "pinata") {

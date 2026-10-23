@@ -24,7 +24,7 @@ import { viewerAuthHeaders } from "./viewer-auth";
 //   the amount owed is floor(sum / 3600), rounding in the viewer's favour.
 // - A receipt for the all-time cumulative amount (viewer -> creator, per referrer) is signed
 //   with the session key every billed tick, POSTed every 60 paid seconds, immediately when paid
-//   progress crosses 10/25/50/75/100% (the server settles on-chain then), on pause, and beaconed
+//   progress crosses 10/25/50/75/100% (the server settles onchain then), on pause, and beaconed
 //   on exit.
 
 const FLUSH_EVERY_PAID = 60;
@@ -130,7 +130,7 @@ export function useMeter(opts: {
   const cumulativeNow = () => (base.current ?? 0n) + owed();
   const coveredCount = () => (coverage.current ? countBits(coverage.current, duration()) : 0);
 
-  // 1. Starting cumulative for this lane: max(local, stored on server, settled on-chain). Never decreases.
+  // 1. Starting cumulative for this lane: max(local, stored on server, settled onchain). Never decreases.
   useEffect(() => {
     if (!enabled || !viewer || !creator) return;
     let cancelled = false;
@@ -285,7 +285,7 @@ export function useMeter(opts: {
         if (mi > milestone.current) {
           milestone.current = mi;
           c.paidAtFlush = c.paid;
-          void flush(); // server settles on-chain at 10/25/50/75/100%
+          void flush(); // server settles onchain at 10/25/50/75/100%
         } else if (c.paid - c.paidAtFlush >= FLUSH_EVERY_PAID) {
           c.paidAtFlush = c.paid;
           void flush();

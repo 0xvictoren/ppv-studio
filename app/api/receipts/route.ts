@@ -22,7 +22,7 @@ const SLACK_SECONDS = 15; // rounding + tick jitter allowance per post
  * POST a signed EIP-712 receipt. Accepts application/json or text/plain (sendBeacon).
  * Only the highest cumulativeAmount per (viewer, creator, referrer) is kept.
  * The receipt's new amount also pays for newly watched seconds of the video: the server
- * accepts at most as many new seconds as the amount covers, and settles on-chain as soon as
+ * accepts at most as many new seconds as the amount covers, and settles onchain as soon as
  * paid progress crosses 10%, 25%, 50%, 75% or 100%.
  */
 export async function POST(req: Request) {
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
   }
   if (!viewer && !creator && !referrerParam) return error("Pass viewer, creator or referrer");
   const rows = await listReceipts({ viewer: viewer ?? undefined, creator: creator ?? undefined, referrer: referrerParam ?? undefined });
-  // Use live on-chain settled amounts so "pending" is exact even between settlements.
+  // Use live onchain settled amounts so "pending" is exact even between settlements.
   const withSettled = await Promise.all(
     rows.map(async (r) => {
       const s = await readPpw<bigint>("settled", [r.viewer, r.creator, r.referrer]);

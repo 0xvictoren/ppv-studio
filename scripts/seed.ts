@@ -4,9 +4,9 @@
  *   npm run seed                 # targets NEXT_PUBLIC_APP_URL (default http://localhost:3000)
  *   npm run seed -- https://ppw.example.com
  *
- * Uses SEED_CREATOR_PRIVATE_KEY as the creator: registers each video on-chain (skipping ones
+ * Uses SEED_CREATOR_PRIVATE_KEY as the creator: registers each video onchain (skipping ones
  * already registered), signs in with SIWE, then saves metadata through POST /api/videos, which
- * re-verifies the registration on-chain. The wallet needs a little test USDC for gas.
+ * re-verifies the registration onchain. The wallet needs a little test USDC for gas.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { createPublicClient, createWalletClient, defineChain, encodePacked, http, keccak256, type Address, type Hex } from "viem";
@@ -67,13 +67,13 @@ async function main() {
       console.log(`- ${v.title}: already published`);
       continue;
     }
-    // Find or create the on-chain registration.
+    // Find or create the onchain registration.
     const [creator] = await pub.readContract({ address: contract, abi: ppwAbi, functionName: "videos", args: [id] });
     let tx: Hex;
     if (creator === "0x0000000000000000000000000000000000000000") {
       tx = await wallet.writeContract({ address: contract, abi: ppwAbi, functionName: "registerVideo", args: [id, v.pricePerHour] });
       await pub.waitForTransactionReceipt({ hash: tx });
-      console.log(`- ${v.title}: registered on-chain ${tx}`);
+      console.log(`- ${v.title}: registered onchain ${tx}`);
     } else {
       const logs = await pub.getContractEvents({ address: contract, abi: ppwAbi, eventName: "VideoRegistered", args: { videoId: id }, fromBlock: BigInt(process.env.NEXT_PUBLIC_PPW_DEPLOY_BLOCK ?? 0) });
       if (!logs[0]) throw new Error(`Couldn't find the registration of ${v.title}`);

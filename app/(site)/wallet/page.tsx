@@ -67,7 +67,7 @@ function Wallet({ address }: { address: Address }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Escrowed balance" value={escrow.data ? formatUsdc(escrow.data.balance) : null} hint={escrow.data && escrow.data.unsettled > 0n ? `${formatUsdc(escrow.data.unsettled)} watched, settling at the top of the hour` : "In the PayPerWatch contract"} />
         <Stat label="Available to watch" value={escrow.data ? formatUsdc(escrow.data.available) : null} hint={escrow.data ? `Wallet: ${formatUsdc(escrow.data.wallet)}` : undefined} />
-        <Stat label="Total spent" value={events.data ? formatUsdc(totalSpent) : null} hint="Settled on-chain" />
+        <Stat label="Total spent" value={events.data ? formatUsdc(totalSpent) : null} hint="Settled onchain" />
         <Stat label="Total watch time" value={sessions.data ? formatMinutes(watchSeconds) : null} hint={`${sessions.data?.length ?? 0} sessions`} />
       </div>
 

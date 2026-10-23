@@ -38,6 +38,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter
 from pathlib import Path
@@ -81,7 +82,15 @@ def load_env():
 # ---------------------------------------------------------------- ffmpeg helpers
 
 
+# Uploads are untrusted. Only let ffmpeg read the downloaded file itself, as a plain video
+# container: no network protocols, and no playlist formats (HLS, concat) that open other files.
+INPUT_LIMITS = ["-protocol_whitelist", "file", "-format_whitelist", "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,ogg,avi,mpegts,flv"]
+MAX_DOWNLOAD_BYTES = 4 << 30
+
+
 def run(cmd: list[str], cwd: str | None = None) -> bytes:
+    if cmd[0] in ("ffmpeg", "ffprobe"):
+        cmd = [cmd[0], *INPUT_LIMITS, *cmd[1:]]
     p = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.returncode != 0:
         raise RuntimeError(f"{cmd[0]} failed: {p.stderr.decode(errors='replace')[-400:]}")
@@ -163,7 +172,7 @@ def analyze(path: str, model: Path, procs: int) -> dict:
         audio = f_audio.result() if f_audio else np.zeros(0, dtype=np.uint32)
         segments = f_text.result() if f_text else []
     log(f"  analyzed {duration / 60:.1f} min in {time.time() - t0:.0f}s: {len(frames)} frames, {len(audio)} audio items, {len(segments)} speech segments")
-    return {"frames": frames, "audio": audio, "segments": segments, "transcript": " ".join(s["text"] for s in segments)}
+    return {"duration": duration, "frames": frames, "audio": audio, "segments": segments, "transcript": " ".join(s["text"] for s in segments)}
 
 
 # ---------------------------------------------------------------- comparison
@@ -312,8 +321,15 @@ def decode_entry(e: dict) -> dict:
 
 
 def download(url: str, dest: str):
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        raise ValueError("refusing a non-http download link")
     with urllib.request.urlopen(url, timeout=120) as r, open(dest, "wb") as f:
-        shutil.copyfileobj(r, f, 1 << 20)
+        total = 0
+        while chunk := r.read(1 << 20):
+            total += len(chunk)
+            if total > MAX_DOWNLOAD_BYTES:
+                raise ValueError("video is larger than 4 GB")
+            f.write(chunk)
 
 
 def process(site: Site, job: dict, kind: str, published: list[dict], model: Path, procs: int):
@@ -325,6 +341,7 @@ def process(site: Site, job: dict, kind: str, published: list[dict], model: Path
         download(job["downloadUrl"], path)
         a = analyze(path, model, procs)
         body["entry"] = encode_entry(a)
+        body["duration"] = round(a["duration"])
         if kind == "review":
             others = [p for p in published if p["id"] != job["id"]]
             body["result"] = judge(a, job["title"], job.get("description", ""), others)

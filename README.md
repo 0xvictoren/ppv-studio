@@ -2,7 +2,7 @@
 
 **Pay only for what you watch.** Movies, tutorials and exclusive videos you pay for by the second in USDC on
 Arc. Creators upload, choose a category and set a price per hour. Viewers connect their own wallet, deposit once and
-watch with no popups. Receipts are settled on-chain every hour, and any site can embed it with one line.
+watch with no popups. Receipts are settled onchain every hour, and any site can embed it with one line.
 
 Runs on **Arc Testnet** against the deployed contract
 [`0xfff2…93e7`](https://explorer.testnet.arc.io/address/0xfff200a3921d18ae09616901a1aaf9434ce693e7) (v3).
@@ -26,7 +26,7 @@ npm run build && npm start      # http://localhost:3000
   empty on day one.
 
 Checks (no funds needed): `npx tsx scripts/smoke-testnet.ts http://localhost:3000` (23 checks: pages, framing
-headers, Arc reads, SIWE, upload and ranged playback, on-chain verification and rejection paths) and
+headers, Arc reads, SIWE, upload and ranged playback, onchain verification and rejection paths) and
 `npx tsx scripts/check-eip712.ts` (frontend receipt digest equals the contract's `hashReceipt()`).
 
 ## Deploying on Vercel (MongoDB Atlas + Cloudflare R2)
@@ -105,9 +105,9 @@ default). When it's on, a signed-in viewer who has watched the video can open **
 for 30 days). At settlement the **contract** pays the referrer 5% (`referralBps`, owner-adjustable up to 10%) of that
 viewer's spend, taken from the creator's share. The viewer's price and the 5% platform fee don't change. With sharing
 off, the server refuses referral receipts for that video. (A viewer colluding with a sharer could still sign one and
-submit it to the contract directly; the rate is enforced on-chain, the per-video opt-out by the platform.)
+submit it to the contract directly; the rate is enforced onchain, the per-video opt-out by the platform.)
 
-Rules enforced on-chain (contract v3): the referrer can't be the viewer or the creator, and must already have paid that
+Rules enforced onchain (contract v3): the referrer can't be the viewer or the creator, and must already have paid that
 creator, which stops free self-referral with a fresh wallet. Settlement runs unreferred receipts first so a referrer's
 own payment lands before receipts that depend on it. Earnings show under **Wallet → Referral earnings**.
 Platforms can pass their wallet as the referrer in embeds with `data-ref="0x…"`.
@@ -115,7 +115,7 @@ Platforms can pass their wallet as the referrer in embeds with `data-ref="0x…"
 ## Categories
 
 Movies, Tutorials, Exclusive (members-style gated content) and Other. Categories are metadata; every video is
-gated the same way, by pay-per-second on-chain.
+gated the same way, by pay-per-second onchain.
 
 ## Design
 
@@ -137,7 +137,7 @@ first fallback, so Apple devices render the system SF Pro regardless.
 | USDC math (bigint base units, never floats) | `lib/money.ts` |
 | Metering and receipt signing | `lib/client/meter.ts` |
 | Session keys (browser, per viewer, spend-capped) | `lib/client/session-key.ts` |
-| Receipt verification (signer, on-chain session key, monotonic) | `app/api/receipts/route.ts` |
+| Receipt verification (signer, onchain session key, monotonic) | `app/api/receipts/route.ts` |
 | Hourly settlement | `lib/server/settle.ts`, `app/api/cron/settle`, `instrumentation.ts` |
 | Storage (local disk, Supabase, Livepeer, Pinata) | `app/api/storage/*`, `app/media/[file]`, `lib/storage/client.ts` |
 
@@ -147,10 +147,10 @@ first fallback, so Apple devices render the system SF Pro regardless.
 - Watching ≥97% grants a free-replay pass until 30 days after first starting the video.
 - Billing happens only while the video plays (not paused, seeking or buffering). Nothing is ever paused automatically:
   not on tab switches, not during long sessions. The only automatic stop is an empty balance.
-- Receipts are posted every 60 paid seconds, on pause and on exit (`sendBeacon`), and the server settles on-chain as
+- Receipts are posted every 60 paid seconds, on pause and on exit (`sendBeacon`), and the server settles onchain as
   soon as paid progress crosses 10%, 25%, 50%, 75% and 100%, plus an hourly sweep.
 - Each receipt can unlock at most as many new paid seconds as its amount covers, so the bitmap can't be inflated.
-- **Downloads** (`/api/downloads`, `/library`): pay the unpaid remainder of the full price, settled on-chain before
+- **Downloads** (`/api/downloads`, `/library`): pay the unpaid remainder of the full price, settled onchain before
   release, then the video is saved in the browser (IndexedDB) for in-app offline playback with a 30-day pass.
   Re-downloads within the pass are free. Local uploads stream only via short-lived viewer-bound tokens, and the player
   hides the browser's download control. Determined users can still capture a stream; real protection needs DRM.
@@ -161,7 +161,7 @@ receipts to `data/archive/`, keeps videos, progress and passes), set the new add
 
 ## Known limitations
 
-- View counts and minutes watched are reported by the client and used for analytics only. Money is governed by signed receipts and on-chain caps.
+- View counts and minutes watched are reported by the client and used for analytics only. Money is governed by signed receipts and onchain caps.
 - The file store suits a single server. Use Supabase to run more than one instance.
 - Events are scanned from the RPC in 10k-block chunks with a short cache. A long-lived deployment should use an indexer.
 - Owner and fee recipient are the settler wallet in `.env.local` (`0x85a5…8c98`). Use a separate, hardware-held owner before mainnet.

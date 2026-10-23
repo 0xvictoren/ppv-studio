@@ -124,12 +124,12 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
         setPhase({ k: "uploading", pct: 0 });
         uploaded.current = await uploadVideo(file, (pct) => setPhase({ k: "uploading", pct }));
       }
-      const { contentCid, playbackUrl } = uploaded.current;
+      const { contentCid, playbackUrl, uploadRef } = uploaded.current;
       const videoId = computeVideoId(address as Address, contentCid);
 
       if (!reviewed.current) {
         setPhase({ k: "checking", review: null });
-        const review = await checkOriginality({ contentCid, playbackUrl, title, description, durationSeconds: duration }, (r) =>
+        const review = await checkOriginality({ contentCid, playbackUrl, uploadRef, title, description, durationSeconds: duration }, (r) =>
           setPhase({ k: "checking", review: r }),
         );
         if (review.status === "blocked" || review.status === "held") {
@@ -151,7 +151,7 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
       setPhase({ k: "saving", hash });
       await api("/api/videos", {
         method: "POST",
-        json: { txHash: hash, contentCid, title, description, category, referralsEnabled: shareEnabled, thumbnailUrl: chosenThumb, playbackUrl, durationSeconds: duration },
+        json: { txHash: hash, contentCid, uploadRef, title, description, category, referralsEnabled: shareEnabled, thumbnailUrl: chosenThumb, playbackUrl, durationSeconds: duration },
       });
       setPhase({ k: "done", hash, videoId });
     } catch (e) {
@@ -435,7 +435,7 @@ function Section({ n, title, children }: { n: string; title: string; children: R
 
 /** Queue the upload for the originality check and wait for the worker's verdict. */
 async function checkOriginality(
-  upload: { contentCid: string; playbackUrl: string; title: string; description: string; durationSeconds: number },
+  upload: { contentCid: string; playbackUrl: string; uploadRef?: string; title: string; description: string; durationSeconds: number },
   onUpdate: (r: ReviewRow) => void,
 ): Promise<ReviewRow> {
   let { review } = await api<{ review: ReviewRow }>("/api/reviews", { method: "POST", json: upload });
@@ -532,7 +532,7 @@ function PublishStatus({ phase }: { phase: Phase }) {
     const link = explorerTx(phase.hash);
     return (
       <p className="text-sm text-muted-foreground">
-        {phase.k === "pending" ? "Registering on Arc…" : "Confirmed on-chain. Saving details…"}{" "}
+        {phase.k === "pending" ? "Registering on Arc…" : "Confirmed onchain. Saving details…"}{" "}
         {link && (
           <a className="text-secondary underline-offset-4 hover:underline" href={link} target="_blank" rel="noopener noreferrer">
             View transaction

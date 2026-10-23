@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 /**
- * PATCH: re-sync cached price/active from chain after the creator changes them on-chain,
+ * PATCH: re-sync cached price/active from chain after the creator changes them onchain,
  * and/or set { referralsEnabled } (creator only).
  */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

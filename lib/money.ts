@@ -2,7 +2,7 @@
 export const USDC_DECIMALS = 6;
 export const ONE_USDC = 1_000_000n;
 export const MAX_PRICE_PER_HOUR = 100n * ONE_USDC;
-export const PLATFORM_FEE_BPS = 500n; // 5%, set on-chain via setFee(500)
+export const PLATFORM_FEE_BPS = 500n; // 5%, set onchain via setFee(500)
 export const PLATFORM_FEE_LABEL = `${Number(PLATFORM_FEE_BPS) / 100}%`;
 
 /** "0.50" -> 500000n. Returns null for anything that isn't a plain non-negative decimal. */

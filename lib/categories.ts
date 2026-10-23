@@ -1,4 +1,4 @@
-// Content categories. Metadata only: every video is pay-per-second gated on-chain the same way.
+// Content categories. Metadata only: every video is pay-per-second gated onchain the same way.
 export const CATEGORIES = [
   { id: "movies", label: "Movies", blurb: "Films and shorts" },
   { id: "tutorials", label: "Tutorials", blurb: "Courses, lessons and how-tos" },

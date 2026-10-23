@@ -19,7 +19,7 @@ const FAQ = [
   ["What does a video cost?", "Each creator sets a price per hour. A $1/hr video costs under 2¢ a minute, and you only pay for the minutes you play."],
   ["Do I pay again if I rewatch?", "No. You pay for each second of a video once. Come back after a break and billing picks up where new footage starts. Finish a video and replays are free for 30 days."],
   ["Can I download videos?", "Yes, inside the app, to watch offline. You pay only the part you haven't watched yet, and you can delete and re-download it free for 30 days."],
-  ["When do creators get paid?", "As you watch: payments settle on-chain when a viewer reaches 10%, 25%, 50%, 75% and 100% of a video, plus a sweep every hour. Earnings go straight to the creator's wallet, minus a 5% platform fee."],
+  ["When do creators get paid?", "As you watch: payments settle onchain when a viewer reaches 10%, 25%, 50%, 75% and 100% of a video, plus a sweep every hour. Earnings go straight to the creator's wallet, minus a 5% platform fee."],
   ["Can I get my money back?", "Anything you haven't watched stays in your balance. Request a withdrawal and it's ready an hour later, once your last minutes are settled."],
   ["Is this real money?", "PayPerWatch currently runs on Arc Testnet with free test USDC from Circle's faucet. Nothing you do here costs real money."],
 ];
