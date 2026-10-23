@@ -1,5 +1,5 @@
 import "server-only";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // Cloudflare R2 (S3-compatible) video storage. The bucket stays private: browsers upload and
@@ -41,4 +41,21 @@ export function presignRead(key: string, ttlSeconds: number) {
 /** Server-side upload (used by the migration script). */
 export async function putObject(key: string, body: Buffer | NodeJS.ReadableStream, contentType: string, contentLength?: number) {
   await client().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body as never, ContentType: contentType, ContentLength: contentLength }));
+}
+
+/** Delete one object, or everything under a prefix ending in "/" (a video's HLS segments). */
+export async function deleteObjects(keyOrPrefix: string) {
+  let keys = [keyOrPrefix];
+  if (keyOrPrefix.endsWith("/")) {
+    keys = [];
+    let token: string | undefined;
+    do {
+      const page = await client().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: keyOrPrefix, ContinuationToken: token }));
+      keys.push(...(page.Contents ?? []).map((o) => o.Key!));
+      token = page.NextContinuationToken;
+    } while (token);
+  }
+  for (let i = 0; i < keys.length; i += 1000) {
+    await client().send(new DeleteObjectsCommand({ Bucket: bucket(), Delete: { Objects: keys.slice(i, i + 1000).map((Key) => ({ Key })), Quiet: true } }));
+  }
 }

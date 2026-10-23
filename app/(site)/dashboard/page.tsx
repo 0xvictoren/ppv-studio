@@ -1,23 +1,27 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckIcon, CodeIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { CheckIcon, CodeIcon, InfoCircledIcon, TrashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Address } from "viem";
 import { EventsTable } from "@/components/events-table";
 import { SettleNowButton } from "@/components/settle-now";
 import { SignInGate } from "@/components/sign-in-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, EmptyState, Input, PageTitle, Skeleton } from "@/components/ui/primitives";
 import { Switch } from "@/components/ui/switch";
 import { useAppAccount } from "@/lib/client/account";
 import { api } from "@/lib/client/api";
+import { friendlyError } from "@/lib/client/errors";
 import { useEvents, useVideos, type VideoDTO } from "@/lib/client/hooks";
 import { readPpw } from "@/lib/client/ppw";
 import { useTx } from "@/lib/client/tx";
 import type { PpwEvent } from "@/lib/contract";
+import { ZERO_ADDRESS } from "@/lib/contract";
 import { env } from "@/lib/env";
 import { feeOf, PLATFORM_FEE_LABEL, formatMinutes, formatUsdc, MAX_PRICE_PER_HOUR, parseUsdc, toDecimal } from "@/lib/money";
 
@@ -140,11 +144,14 @@ function Dashboard() {
               </Button>
             </EmptyState>
           ) : (
+            <>
+            <MoveAllBanner videos={videos.data} />
             <ul className="divide-y">
               {videos.data.map((v) => (
                 <VideoRow key={v.id} video={v} stats={perVideo.get(v.id)} />
               ))}
             </ul>
+            </>
           )}
         </CardContent>
       </Card>
@@ -209,6 +216,7 @@ function VideoRow({ video, stats }: { video: VideoDTO; stats?: { seconds: number
   const price = live.data && live.data.price > 0n ? live.data.price : BigInt(video.price_per_hour);
   const active = live.data?.active ?? video.active;
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [draft, setDraft] = useState(toDecimal(price, 2));
   const next = parseUsdc(draft, 2);
   const invalid = next === null || next <= 0n || next > MAX_PRICE_PER_HOUR;
@@ -233,16 +241,16 @@ function VideoRow({ video, stats }: { video: VideoDTO; stats?: { seconds: number
       </Link>
       {notOnChain && (
         <div className="flex flex-wrap items-center gap-3 rounded-md bg-tint px-4 py-3 text-[13px] text-muted-foreground md:basis-full md:order-last">
-          <span>PayPerWatch moved to a new contract. Publish this video there so people can keep watching. Its price and stats stay the same.</span>
+          <span>PayPerWatch moved to a new contract. Move this video there so people can keep watching. No re-upload: the file, price, stats and transcript stay the same.</span>
           <Button
             size="sm"
             disabled={republishTx.busy}
             onClick={async () => {
-              const ok = await republishTx.run(address, [{ label: "Publish", fn: "registerVideo", args: [video.id, BigInt(video.price_per_hour)] }], "Published on the new contract.");
+              const ok = await republishTx.run(address, [{ label: "Move", fn: "registerVideo", args: [video.id, BigInt(video.price_per_hour)] }], "Moved to the new contract.");
               if (ok) await sync();
             }}
           >
-            {republishTx.label("Publish on new contract")}
+            {republishTx.label("Move to new contract")}
           </Button>
         </div>
       )}
@@ -295,7 +303,100 @@ function VideoRow({ video, stats }: { video: VideoDTO; stats?: { seconds: number
         <Button size="sm" variant="ghost" onClick={copyEmbed} aria-label={`Copy embed code for ${video.title}`}>
           {copied ? <CheckIcon /> : <CodeIcon />} {copied ? "Copied" : "Embed"}
         </Button>
+        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleting(true)} aria-label={`Delete ${video.title}`}>
+          <TrashIcon /> Delete
+        </Button>
       </div>
+      <DeleteDialog open={deleting} onOpenChange={setDeleting} video={video} activeOnchain={!notOnChain && active} />
     </li>
+  );
+}
+
+/** After a contract change: one button that moves every video still on the old contract. */
+function MoveAllBanner({ videos }: { videos: VideoDTO[] }) {
+  const { address } = useAppAccount();
+  const qc = useQueryClient();
+  const tx = useTx();
+  const missing = useQuery({
+    queryKey: ["onchain-missing", videos.map((v) => v.id).join()],
+    queryFn: async () => {
+      const rows = await Promise.all(videos.map(async (v) => ({ v, creator: (await readPpw<readonly [string, bigint, boolean]>("videos", [v.id]))[0] })));
+      return rows.filter((r) => r.creator === ZERO_ADDRESS).map((r) => r.v);
+    },
+  });
+  const list = missing.data ?? [];
+  if (list.length < 2) return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary-border bg-tint px-4 py-3 text-[13px]">
+      <span>
+        {list.length} videos are still on the old contract. Move them all with one confirmation per video. Nothing is uploaded again.
+      </span>
+      <Button
+        size="sm"
+        disabled={tx.busy}
+        onClick={async () => {
+          const ok = await tx.run(
+            address,
+            list.map((v) => ({ label: `Move "${v.title}"`, fn: "registerVideo" as const, args: [v.id, BigInt(v.price_per_hour)] })),
+            `Moved ${list.length} videos to the new contract.`,
+          );
+          await Promise.all(list.map((v) => api(`/api/videos/${v.id}`, { method: "PATCH" }).catch(() => {})));
+          await qc.invalidateQueries();
+          if (ok) await missing.refetch();
+        }}
+      >
+        {tx.label(`Move all ${list.length}`)}
+      </Button>
+    </div>
+  );
+}
+
+/** Delete for good: unpublish onchain first if needed (one confirmation), then remove everything. */
+function DeleteDialog({ open, onOpenChange, video, activeOnchain }: { open: boolean; onOpenChange: (o: boolean) => void; video: VideoDTO; activeOnchain: boolean }) {
+  const { address } = useAppAccount();
+  const qc = useQueryClient();
+  const tx = useTx();
+  const [busy, setBusy] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const working = busy || tx.busy;
+
+  async function remove() {
+    setBusy(true);
+    try {
+      if (activeOnchain) {
+        const ok = await tx.run(address, [{ label: "Unpublish", fn: "setVideoActive", args: [video.id, false] }], "Unpublished. Deleting…");
+        if (!ok) return;
+      }
+      await api(`/api/videos/${video.id}`, { method: "DELETE" });
+      toast.success(`Deleted "${video.title}".`);
+      onOpenChange(false);
+      await qc.invalidateQueries({ queryKey: ["videos"] });
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !working && onOpenChange(o)}
+      title="Delete this video?"
+      description="This removes it from PayPerWatch for good: the listing, the uploaded file, its stream and its transcript. It can't be undone."
+    >
+      <ul className="list-disc space-y-1.5 pl-5 text-[13px] text-muted-foreground">
+        <li>Money you&apos;ve already earned stays yours, and payments for watching up to now still settle.</li>
+        <li>People who downloaded it can keep watching their copy until their 30-day pass ends.</li>
+        {activeOnchain && <li>Your wallet will ask you to confirm one transaction to unpublish it first.</li>}
+      </ul>
+      <label className="mt-5 block text-[13px]" htmlFor={`confirm-${video.id}`}>
+        Type <strong>delete</strong> to confirm
+      </label>
+      <Input id={`confirm-${video.id}`} className="mt-1.5" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} disabled={working} autoComplete="off" />
+      <Button variant="destructive" className="mt-4 w-full" disabled={confirmText.trim().toLowerCase() !== "delete" || working} onClick={remove}>
+        {tx.busy ? tx.label("") : busy ? "Deleting…" : `Delete "${video.title}"`}
+      </Button>
+    </Dialog>
   );
 }

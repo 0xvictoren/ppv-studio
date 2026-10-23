@@ -188,6 +188,17 @@ export async function putIndexEntry(row: Omit<MediaIndexRow, "created_at">): Pro
   save();
 }
 
+/** Forget a deleted video's fingerprints and transcript (search, agent API and originality checks). */
+export async function deleteIndexForVideo(videoId: string): Promise<void> {
+  if (mongoEnabled()) {
+    await (await col<WithId<MediaIndexRow>>("media_index")).deleteMany({ video_id: lc(videoId) });
+    return;
+  }
+  let changed = false;
+  for (const [id, r] of local().index) if (r.video_id === lc(videoId)) changed = local().index.delete(id) || changed;
+  if (changed) save();
+}
+
 /** Mark an indexed upload as published, so later uploads are compared against it. */
 export async function linkIndexToVideo(id: string, videoId: string): Promise<void> {
   if (mongoEnabled()) {
@@ -291,6 +302,14 @@ export async function putHls(row: HlsRow): Promise<void> {
   }
   extra().hls.set(row.id, row);
   saveExtra();
+}
+
+export async function deleteHls(id: string): Promise<void> {
+  if (mongoEnabled()) {
+    await (await col<WithId<HlsRow>>("hls")).deleteOne({ _id: id });
+    return;
+  }
+  if (extra().hls.delete(id)) saveExtra();
 }
 
 export async function getHlsGrants(viewer: string, videoId: string): Promise<HlsGrantRow | null> {

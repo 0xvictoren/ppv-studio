@@ -294,6 +294,17 @@ export async function updateVideo(id: string, patch: Partial<Pick<VideoRow, "pri
   }
 }
 
+/** Remove a video's listing. Watch history, receipts and passes are kept. */
+export async function deleteVideo(id: string) {
+  if (mongoEnabled()) return mg.deleteVideo(id);
+  const sb = supabase();
+  if (sb) {
+    check(await sb.from("videos").delete().eq("id", lc(id)));
+    return;
+  }
+  if (local().videos.delete(lc(id))) save();
+}
+
 // ------------------------------------------------------------------ receipts
 
 export async function getReceipt(viewer: string, creator: string, referrer: string = ZERO): Promise<ReceiptRow | null> {

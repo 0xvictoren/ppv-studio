@@ -277,7 +277,8 @@ Each row shows the thumbnail, title, views, minutes watched, and the value of th
 | **Unpublish / Republish** | Hides or restores the video (also onchain). Viewers see "This video has been unpublished by its creator" while it's hidden. |
 | **Share and earn** | Turns referral rewards on or off for this video. Takes effect immediately, with no transaction. |
 | **Embed** | Copies the code to put this video on another website. |
-| **Publish on new contract** | Only shown after PayPerWatch moves to a new contract version. One click, one transaction, and the video is live again with the same price and stats. |
+| **Move to new contract** | Only shown after PayPerWatch moves to a new contract version. One click, one transaction, and the video is live again. Nothing is uploaded again: the file, price, stats and transcript stay the same. When more than one video needs moving, a **Move all** button at the top of the list does them together (your wallet asks once per video). |
+| **Delete** | Removes the video for good: the listing, the uploaded file, its stream and its transcript. Type **delete** to confirm. If the video is still published, your wallet first asks you to confirm one transaction to unpublish it. Money you've already earned stays yours, payments for watching up to then still settle, and people who downloaded it can keep watching until their 30-day pass ends. This can't be undone. To hide a video temporarily instead, use **Unpublish**. |
 
 ### Settlements
 

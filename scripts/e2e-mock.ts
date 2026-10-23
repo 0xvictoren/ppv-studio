@@ -194,6 +194,16 @@ async function main() {
   const events = (await (await fetch(`${BASE}/api/events?viewer=${viewer.address}`)).json()).events.map((e: { name: string }) => e.name);
   check("events include Deposited/Settled/Withdrawn", ["Deposited", "Settled", "Withdrawn"].every((n) => events.includes(n)), events);
 
+  // Deleting: creator only, and only once unpublished onchain.
+  const del = (cookie?: string) => fetch(`${BASE}/api/videos/${sintel.id}`, { method: "DELETE", headers: cookie ? { cookie } : {} });
+  check("delete needs sign-in", (await del()).status === 401);
+  check("delete refused while published", (await del(cCookie)).status === 409);
+  await chain("write", "setVideoActive", [sintel.id, false], creator.address);
+  check("creator deletes an unpublished video", (await del(cCookie)).status === 200);
+  check("deleted video is gone", (await fetch(`${BASE}/api/videos/${sintel.id}`)).status === 404);
+  const left = (await (await fetch(`${BASE}/api/videos`)).json()).videos as { id: string }[];
+  check("deleted video left the catalog", !left.some((x) => x.id === sintel.id));
+
   console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
   process.exit(failures ? 1 : 0);
 }

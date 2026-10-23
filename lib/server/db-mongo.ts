@@ -32,6 +32,10 @@ export async function patchVideo(id: string, patch: Partial<VideoRow>): Promise<
   await (await col<WithId<VideoRow>>("videos")).updateOne({ _id: lc(id) }, { $set: patch });
 }
 
+export async function deleteVideo(id: string): Promise<void> {
+  await (await col("videos")).deleteOne({ _id: lc(id) } as never);
+}
+
 export async function countVideos(): Promise<number> {
   return (await col("videos")).estimatedDocumentCount();
 }
