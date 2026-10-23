@@ -24,15 +24,13 @@ This manual covers everything in the app: watching, paying, downloading, sharing
 
 | Item | What it's for |
 |---|---|
-| **Browse** | Find videos to watch. |
-| **Upload** | Publish a video and set its price. |
-| **Downloads** | Videos you saved to watch offline. |
-| **Wallet** | Your balance, withdrawals, spending, referral earnings and history. |
 | **Dashboard** | For creators: your videos, prices, earnings and payouts. |
+| **Spendings** | Your balance, withdrawals, spending, referral earnings and history. |
+| **Downloads** | Videos you saved to watch offline. |
 | **Developers** | Embed codes for other websites, and the API for AI agents. |
 | **Manual** | This page. |
 
-The button in the top right corner connects your wallet. Once you're connected, it shows how much you have available to watch. Click it for your address, your wallet's USDC, **Sign in**, **Get test USDC**, **View on explorer** and **Disconnect**. The sun and moon icon next to it switches between light and dark mode.
+The **Upload** button in the top right corner publishes a video. To browse videos, click the PayPerWatch logo, then **Start watching**. The button next to the sun and moon icon connects your wallet. Once you're connected, it shows how much you have available to watch. Click it for your address, your wallet's USDC, **Sign in**, **Get test USDC**, **View on explorer** and **Disconnect**. The sun and moon icon next to it switches between light and dark mode.
 
 ## Getting started
 
@@ -58,7 +56,7 @@ Watching doesn't need signing in. Adding funds is enough.
 
 ### Finding something to watch
 
-Open **Browse**.
+Open the catalog: click the PayPerWatch logo, then **Start watching** on the home page. You can also use **Browse** in the footer of any page.
 
 - **Categories:** All, Movies, Tutorials, Exclusive and Other.
 - **Search:** searches titles and descriptions.
@@ -76,7 +74,7 @@ The first time you press play, PayPerWatch asks you to add funds:
    - **Deposit**: moves the USDC into your PayPerWatch balance and sets up a session key for this browser.
 3. Press play. For the next 24 hours, you won't see any more popups.
 
-You can also add funds any time from the **Wallet** page or the **Add funds** button beside the player.
+You can also add funds any time from the **Spendings** page or the **Add funds** button beside the player.
 
 ### How billing works
 
@@ -150,11 +148,11 @@ How it works:
 - The 5% comes out of the creator's share. The viewer's price doesn't change.
 - If someone has followed more than one referral link for a video, the first one counts, for 30 days.
 - You can't refer yourself, and creators can't earn referrals on their own videos.
-- Your earnings are paid straight to your wallet whenever settlements run. You can follow them on **Wallet → Referral earnings**.
+- Your earnings are paid straight to your wallet whenever settlements run. You can follow them on **Spendings → Referral earnings**.
 
-## Your wallet page
+## Your spendings page
 
-**Wallet** brings together everything about your money.
+**Spendings** brings together everything about your money.
 
 ### Summary
 
@@ -392,7 +390,7 @@ Setup steps and environment variables are in `README.md`.
 | Change the platform fee | `npx tsx scripts/set-fee.ts`. It proposes the new fee onchain, and you apply it after the notice period. |
 | Change the withdrawal wait | The contract owner calls `setWithdrawDelay` (1 hour to 7 days, default 24 hours). |
 | Fund the agent account | `npx tsx scripts/agent-wallet.ts` shows balances, `withdraw 5` moves agent earnings out of Gateway, and `deposit 5` funds creator payouts. |
-| Move to a new contract | Deploy it, set `NEXT_PUBLIC_PPW_CONTRACT`, `NEXT_PUBLIC_PPW_DEPLOY_BLOCK` and `NEXT_PUBLIC_PPW_LEGACY_CONTRACTS`, then run `npx tsx scripts/migrate-contract.ts <old address>`. Creators republish from the dashboard, and viewers withdraw old balances from the Wallet page. |
+| Move to a new contract | Deploy it, set `NEXT_PUBLIC_PPW_CONTRACT`, `NEXT_PUBLIC_PPW_DEPLOY_BLOCK` and `NEXT_PUBLIC_PPW_LEGACY_CONTRACTS`, then run `npx tsx scripts/migrate-contract.ts <old address>`. Creators republish from the dashboard, and viewers withdraw old balances from the Spendings page. |
 | Check the deployment | `npx tsx scripts/smoke-testnet.ts <site url>` runs the end-to-end checks without spending funds. |
 
 ## Troubleshooting

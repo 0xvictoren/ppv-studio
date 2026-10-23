@@ -1,6 +1,6 @@
 "use client";
 
-import { Cross2Icon, HamburgerMenuIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, HamburgerMenuIcon, MoonIcon, SunIcon, UploadIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -11,11 +11,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/videos", label: "Browse" },
-  { href: "/upload", label: "Upload" },
-  { href: "/library", label: "Downloads" },
-  { href: "/wallet", label: "Wallet" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/wallet", label: "Spendings" },
+  { href: "/library", label: "Downloads" },
   { href: "/developers", label: "Developers" },
   { href: "/manual", label: "Manual" },
 ];
@@ -50,6 +48,12 @@ export function Header() {
           })}
         </nav>
         <div className="ml-auto flex items-center gap-1.5">
+          <Button asChild size="sm" variant={path.startsWith("/upload") ? "secondary" : "outline"} className="gap-1.5">
+            <Link href="/upload" aria-label="Upload a video">
+              <UploadIcon />
+              <span className="hidden sm:inline">Upload</span>
+            </Link>
+          </Button>
           <ThemeToggle />
           <ConnectButton />
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu" aria-expanded={open}>

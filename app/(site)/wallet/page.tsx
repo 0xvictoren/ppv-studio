@@ -50,7 +50,7 @@ function Wallet({ address }: { address: Address }) {
 
   return (
     <div className="container space-y-8">
-      <PageTitle title="Wallet" subtitle={address}>
+      <PageTitle title="Spendings" subtitle={address}>
         <div className="flex flex-wrap gap-2">
           <SettleNowButton />
           {isTestnet && (

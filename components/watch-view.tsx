@@ -491,7 +491,7 @@ export function WatchView({ id, embedded, backHref, refParam }: { id: string; em
             </Button>
             <Button size="sm" variant="ghost" asChild>
               <a href={walletHref} target={embedded ? "_blank" : undefined} rel="noopener">
-                Wallet
+                Spendings
               </a>
             </Button>
           </div>

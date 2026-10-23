@@ -18,7 +18,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             <p className="font-medium text-foreground">PayPerWatch</p>
             <p className="mt-2 max-w-xs">Pay by the second, in USDC, only while the video plays. Running on Arc Testnet.</p>
           </div>
-          <FooterCol title="Watch" links={[["Browse", "/videos"], ["Wallet", "/wallet"], ["How billing works", "/about"], ["Manual", "/manual"]]} />
+          <FooterCol title="Watch" links={[["Browse", "/videos"], ["Spendings", "/wallet"], ["How billing works", "/about"], ["Manual", "/manual"]]} />
           <FooterCol title="Create" links={[["Upload", "/upload"], ["Dashboard", "/dashboard"]]} />
           <FooterCol title="Build" links={[["Embed on your site", "/developers"], ["Contract", "/about#contract"]]} />
         </div>
