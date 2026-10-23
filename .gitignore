@@ -43,3 +43,9 @@ next-env.d.ts
 
 # Never commit real env files
 .env
+
+# review worker
+/worker/models/
+/worker/cache/
+__pycache__/
+/.smoke-data/

@@ -53,6 +53,7 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const txHashes: Hex[] = [];
   let count = 0;
+  let skippedCount = 0;
   let total = 0n;
 
   try {
@@ -82,18 +83,25 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
 
     for (let i = 0; i < due.length; i += BATCH_SIZE) {
       const chunk = due.slice(i, i + BATCH_SIZE);
-      const hash = await submitSettleBatch(chunk.map((d) => d.r), chunk.map((d) => d.sig));
-      console.log(`[settle] settleBatch(${chunk.length}) tx ${hash}`);
+      const { hash, skipped } = await submitSettleBatch(chunk.map((d) => d.r), chunk.map((d) => d.sig));
+      console.log(`[settle] settleBatch(${chunk.length}) tx ${hash}${skipped.length ? `, ${skipped.length} skipped` : ""}`);
       txHashes.push(hash);
-      for (const d of chunk) {
+      for (const s of skipped) {
+        const d = chunk[s.index];
+        console.error(`[settle] skipped ${d.r.viewer} -> ${d.r.creator} (${d.delta} units), reason ${s.reason}`);
+        skippedCount++;
+      }
+      const skippedIdx = new Set(skipped.map((s) => s.index));
+      for (const [j, d] of chunk.entries()) {
         const settled = await readPpw<bigint>("settled", [d.r.viewer, d.r.creator, d.r.referrer]);
         await setSettledAmount(d.r.viewer, d.r.creator, d.r.referrer, settled);
+        if (skippedIdx.has(j)) continue;
+        count++;
+        total += d.delta;
       }
-      count += chunk.length;
-      total += chunk.reduce((a, d) => a + d.delta, 0n);
     }
 
-    const status = count === 0 ? "noop" : "success";
+    const status = skippedCount ? "error" : count === 0 ? "noop" : "success";
     await insertSettlementRun({
       started_at: startedAt,
       finished_at: new Date().toISOString(),
@@ -101,9 +109,9 @@ async function settleNow(opts: { only?: Triple[] }): Promise<SettleResult> {
       receipts_count: count,
       total_amount: total.toString(),
       tx_hash: txHashes.join(",") || null,
-      error: null,
+      error: skippedCount ? `${skippedCount} receipt(s) skipped by the contract; see server logs` : null,
     });
-    return { status, count, total: total.toString(), txHashes };
+    return { status, count, total: total.toString(), txHashes, ...(skippedCount && { error: `${skippedCount} receipt(s) skipped` }) };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[settle] failed:", message);

@@ -14,6 +14,8 @@ import { sendTx, waitTx } from "@/lib/client/ppw";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import { computeVideoId, REFERRAL_LABEL } from "@/lib/contract";
 import { explorerTx } from "@/lib/env";
+import { NOTE_MAX, NOTE_MIN } from "@/lib/review";
+import type { ReviewRow } from "@/lib/server/content-db";
 import { costForSeconds, feeOf, PLATFORM_FEE_LABEL, formatDuration, formatUsdc, MAX_PRICE_PER_HOUR, ONE_USDC, parseUsdc, perMinute } from "@/lib/money";
 import { imageToThumbnail, inspectVideo, uploadVideo, type UploadResult } from "@/lib/storage/client";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,9 @@ const PRESETS = [250_000n, 500_000n, ONE_USDC, 2n * ONE_USDC];
 type Phase =
   | { k: "edit" }
   | { k: "uploading"; pct: number }
+  | { k: "checking"; review: ReviewRow | null }
+  | { k: "held"; review: ReviewRow }
+  | { k: "blocked"; review: ReviewRow }
   | { k: "wallet" }
   | { k: "pending"; hash: Hex }
   | { k: "saving"; hash: Hex }
@@ -47,6 +52,7 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
   const [dragging, setDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const uploaded = useRef<UploadResult | null>(null);
+  const reviewed = useRef<ReviewRow | null>(null);
   const registered = useRef<Hex | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,7 +73,7 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
   const fullCost = price ? costForSeconds(price, duration) : 0n;
   const hundredViewers = fullCost * 100n;
   const toCreator = hundredViewers - feeOf(hundredViewers);
-  const busy = ["uploading", "wallet", "pending", "saving"].includes(phase.k);
+  const busy = ["uploading", "checking", "wallet", "pending", "saving"].includes(phase.k);
   const thumbnails = [...(customThumb ? [customThumb] : []), ...(meta?.thumbnails ?? [])];
   const chosenThumb = thumbnails[thumb] ?? null;
 
@@ -92,7 +98,9 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
     }
     setFile(f);
     uploaded.current = null;
+    reviewed.current = null;
     registered.current = null;
+    setPhase({ k: "edit" });
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "));
     try {
       setMeta(await inspectVideo(f));
@@ -119,6 +127,18 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
       const { contentCid, playbackUrl } = uploaded.current;
       const videoId = computeVideoId(address as Address, contentCid);
 
+      if (!reviewed.current) {
+        setPhase({ k: "checking", review: null });
+        const review = await checkOriginality({ contentCid, playbackUrl, title, description, durationSeconds: duration }, (r) =>
+          setPhase({ k: "checking", review: r }),
+        );
+        if (review.status === "blocked" || review.status === "held") {
+          setPhase({ k: review.status, review });
+          return;
+        }
+        reviewed.current = review;
+      }
+
       if (!registered.current) {
         setPhase({ k: "wallet" });
         const hash = await sendTx("registerVideo", [videoId, price], address);
@@ -139,6 +159,17 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
     }
   }
 
+  async function explain(note: string) {
+    if (phase.k !== "held") return;
+    try {
+      const { review } = await api<{ review: ReviewRow }>(`/api/reviews/${encodeURIComponent(phase.review.id)}`, { method: "POST", json: { note } });
+      reviewed.current = review;
+      await publish();
+    } catch (e) {
+      setPhase({ k: "failed", message: friendlyError(e) });
+    }
+  }
+
   if (phase.k === "done") {
     const link = explorerTx(phase.hash);
     return (
@@ -147,6 +178,7 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
         <h2 className="mt-4 font-display text-[26px] font-semibold">Your video is live</h2>
         <p className="mx-auto mt-2 max-w-md text-[15px] text-muted-foreground">
           Registered on Arc at {formatUsdc(price!)} an hour. Earnings arrive in your wallet at every hourly settlement.
+          {reviewed.current?.score != null && ` Originality score: ${reviewed.current.score}/100.`}
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild>
@@ -364,20 +396,26 @@ export function UploadForm({ watchHref, dashboardHref }: { watchHref: (id: strin
           </p>
         )}
         <PublishStatus phase={phase} />
-        <Button size="lg" className="w-full sm:w-auto" disabled={!valid || busy} onClick={publish}>
-          {busy && <ReloadIcon className="animate-spin" />}
-          {phase.k === "uploading"
-            ? `Uploading ${phase.pct}%`
-            : phase.k === "wallet"
-              ? "Confirm in wallet…"
-              : phase.k === "pending"
-                ? "Pending…"
-                : phase.k === "saving"
-                  ? "Saving…"
-                  : phase.k === "failed"
-                    ? "Try again"
-                    : "Publish"}
-        </Button>
+        {phase.k === "held" || phase.k === "blocked" ? (
+          <ReviewOutcome review={phase.review} watchHref={watchHref} onExplain={explain} />
+        ) : (
+          <Button size="lg" className="w-full sm:w-auto" disabled={!valid || busy} onClick={publish}>
+            {busy && <ReloadIcon className="animate-spin" />}
+            {phase.k === "uploading"
+              ? `Uploading ${phase.pct}%`
+              : phase.k === "checking"
+                ? "Checking originality…"
+                : phase.k === "wallet"
+                  ? "Confirm in wallet…"
+                  : phase.k === "pending"
+                    ? "Pending…"
+                    : phase.k === "saving"
+                      ? "Saving…"
+                      : phase.k === "failed"
+                        ? "Try again"
+                        : "Publish"}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -395,7 +433,91 @@ function Section({ n, title, children }: { n: string; title: string; children: R
   );
 }
 
+/** Queue the upload for the originality check and wait for the worker's verdict. */
+async function checkOriginality(
+  upload: { contentCid: string; playbackUrl: string; title: string; description: string; durationSeconds: number },
+  onUpdate: (r: ReviewRow) => void,
+): Promise<ReviewRow> {
+  let { review } = await api<{ review: ReviewRow }>("/api/reviews", { method: "POST", json: upload });
+  while (review.status === "queued") {
+    onUpdate(review);
+    await new Promise((r) => setTimeout(r, 4000));
+    ({ review } = await api<{ review: ReviewRow }>(`/api/reviews/${encodeURIComponent(review.id)}`));
+  }
+  if (review.status === "failed") throw new Error(`We couldn't check this video${review.error ? `: ${review.error}` : ""}. Try again.`);
+  return review;
+}
+
+function ReviewOutcome({ review, watchHref, onExplain }: { review: ReviewRow; watchHref: (id: string) => string; onExplain: (note: string) => Promise<void> }) {
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const blocked = review.status === "blocked";
+  return (
+    <div role="status" className={cn("space-y-4 rounded-md border p-5 text-[15px]", blocked ? "border-destructive/30 bg-destructive/5" : "bg-muted/60")}>
+      <div>
+        <p className="font-semibold">{blocked ? "This video matches one already on PayPerWatch" : `Originality score: ${review.score}/100`}</p>
+        <p className="mt-1 text-muted-foreground">
+          {blocked
+            ? "Large parts of its picture or sound are the same as the video below, so it can't be published. If you made the original, contact us with proof."
+            : "It covers a lot of the same ground as the videos below. Tell viewers what yours adds, and it will be published with your note."}
+        </p>
+      </div>
+      {review.matches.length > 0 && (
+        <ul className="space-y-1.5">
+          {review.matches.map((m) => (
+            <li key={m.content_cid} className="flex flex-wrap items-baseline justify-between gap-x-4 text-sm">
+              {m.video_id ? (
+                <Link className="text-secondary underline-offset-4 hover:underline" href={watchHref(m.video_id)} target="_blank">
+                  {m.title}
+                </Link>
+              ) : (
+                <span>{m.title}</span>
+              )}
+              <span className="text-muted-foreground tabular">
+                {Math.round(m.similarity * 100)}% {m.kind === "copy" ? "same footage" : "same topic"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!blocked && (
+        <div className="space-y-2">
+          <Label htmlFor="review-note">What does your video add?</Label>
+          <Textarea
+            id="review-note"
+            value={note}
+            maxLength={NOTE_MAX}
+            placeholder="For example: worked examples on live charts, a different method, more depth on one part"
+            onChange={(e) => setNote(e.target.value)}
+            disabled={sending}
+          />
+          {note.trim().length < NOTE_MIN && <p className="text-[13px] text-muted-foreground">At least {NOTE_MIN} characters.</p>}
+          <Button
+            disabled={note.trim().length < NOTE_MIN || sending}
+            onClick={async () => {
+              setSending(true);
+              await onExplain(note.trim());
+              setSending(false);
+            }}
+          >
+            {sending && <ReloadIcon className="animate-spin" />}
+            Publish with this note
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PublishStatus({ phase }: { phase: Phase }) {
+  if (phase.k === "checking") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Checking that this video is original: comparing its picture, sound and speech with every video on PayPerWatch. Long videos can take
+        a few minutes, so keep this tab open.
+      </p>
+    );
+  }
   if (phase.k === "uploading") {
     return (
       <div className="space-y-1.5">

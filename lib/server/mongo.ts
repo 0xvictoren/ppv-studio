@@ -19,6 +19,9 @@ async function connect(): Promise<Db> {
     db.collection("receipts").createIndexes([{ key: { viewer: 1 } }, { key: { creator: 1 } }, { key: { referrer: 1 } }]),
     db.collection("watch_sessions").createIndexes([{ key: { video_id: 1 } }, { key: { viewer: 1 } }, { key: { creator: 1 } }]),
     db.collection("settlement_runs").createIndexes([{ key: { started_at: -1 } }]),
+    db.collection("reviews").createIndexes([{ key: { status: 1 } }, { key: { creator: 1 } }]),
+    db.collection("media_index").createIndexes([{ key: { video_id: 1 } }]),
+    db.collection("agent_purchases").createIndexes([{ key: { creator: 1 } }]),
   ]);
   return db;
 }
@@ -31,7 +34,9 @@ export async function mongo(): Promise<Db> {
   return g.__ppwMongo;
 }
 
-export async function col<T extends Document>(name: "videos" | "receipts" | "watch_sessions" | "watch_progress" | "settlement_runs"): Promise<Collection<T>> {
+export async function col<T extends Document>(
+  name: "videos" | "receipts" | "watch_sessions" | "watch_progress" | "settlement_runs" | "reviews" | "media_index" | "agent_purchases",
+): Promise<Collection<T>> {
   return (await mongo()).collection<T>(name);
 }
 

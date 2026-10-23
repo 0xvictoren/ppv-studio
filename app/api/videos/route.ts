@@ -4,10 +4,12 @@ import { computeVideoId, ppwAbi, PPW_ADDRESS } from "@/lib/contract";
 import { isMock } from "@/lib/env";
 import { MAX_PRICE_PER_HOUR } from "@/lib/money";
 import { publicClient, readPpw } from "@/lib/server/chain";
+import { getReview, linkIndexToVideo } from "@/lib/server/content-db";
 import { insertVideo, listVideos, listWatchSessions, type VideoRow, type WatchSessionRow } from "@/lib/server/db";
 import { getEvents } from "@/lib/server/events";
 import { error, json } from "@/lib/server/http";
 import { rateVideo, type Rating } from "@/lib/server/rating";
+import { reviewEnabled } from "@/lib/server/review";
 import { sessionAddress } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +66,14 @@ export async function POST(req: Request) {
   if (!body.txHash || !body.contentCid || !body.title?.trim() || !body.playbackUrl) return error("Missing fields");
   if (body.thumbnailUrl && body.thumbnailUrl.length > 500_000) return error("Thumbnail too large");
 
+  // Only uploads that passed the originality check (or were held and explained) get listed.
+  if (reviewEnabled()) {
+    const review = await getReview(body.contentCid);
+    if (!review || review.creator !== me || review.playback_url !== body.playbackUrl) return error("Run the originality check before publishing.", 422);
+    if (review.status === "blocked") return error("This video matches one already on PayPerWatch, so it can't be published.", 409);
+    if (review.status !== "passed" && review.status !== "explained") return error("This video's originality check isn't finished.", 409);
+  }
+
   const videoId = computeVideoId(me as Hex, body.contentCid).toLowerCase();
 
   // Find VideoRegistered(videoId, creator=me) in the transaction.
@@ -111,5 +121,6 @@ export async function POST(req: Request) {
     duration_seconds: Math.max(0, Math.round(body.durationSeconds || 0)),
     register_tx: body.txHash,
   });
+  await linkIndexToVideo(body.contentCid, row.id);
   return json({ video: row }, { status: 201 });
 }
