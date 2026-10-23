@@ -17,6 +17,7 @@ const NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/developers", label: "Developers" },
+  { href: "/manual", label: "Manual" },
 ];
 
 export function Header() {
@@ -30,7 +31,7 @@ export function Header() {
         <Link href="/" aria-label="PayPerWatch home" className="shrink-0">
           <Logo />
         </Link>
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">
           {NAV.map((n) => {
             const active = path.startsWith(n.href);
             return (
@@ -51,12 +52,12 @@ export function Header() {
         <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggle />
           <ConnectButton />
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu" aria-expanded={open}>
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu" aria-expanded={open}>
             {open ? <Cross2Icon /> : <HamburgerMenuIcon />}
           </Button>
         </div>
       </div>
-      <div className={cn("grid overflow-hidden transition-[grid-template-rows] duration-300 ease-apple md:hidden", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+      <div className={cn("grid overflow-hidden transition-[grid-template-rows] duration-300 ease-apple lg:hidden", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
         <nav className="container min-h-0" aria-label="Mobile">
           <ul className="flex flex-col pb-3">
             {NAV.map((n) => (

@@ -249,7 +249,7 @@ function WithdrawCard({ address }: { address: Address }) {
             <Button
               disabled={!value || value <= 0n || value > balance || tx.busy}
               onClick={async () => {
-                const ok = await tx.run(address, [{ label: "Request withdrawal", fn: "requestWithdraw", args: [value] }], "Withdrawal requested. It'll be ready in 1 hour.");
+                const ok = await tx.run(address, [{ label: "Request withdrawal", fn: "requestWithdraw", args: [value] }], "Withdrawal requested. It'll be ready in 24 hours.");
                 if (ok) {
                   setAmount("");
                   refresh();
