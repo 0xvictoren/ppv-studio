@@ -26,11 +26,12 @@ This manual covers everything in the app: watching, paying, downloading, sharing
 |---|---|
 | **Dashboard** | For creators: your videos, prices, earnings and payouts. |
 | **Spendings** | Your balance, withdrawals, spending, referral earnings and history. |
+| **Browse** | Find videos to watch. |
 | **Downloads** | Videos you saved to watch offline. |
 | **Developers** | Embed codes for other websites, and the API for AI agents. |
 | **Manual** | This page. |
 
-The **Upload** button in the top right corner publishes a video. To browse videos, click the PayPerWatch logo, then **Start watching**. The button next to the sun and moon icon connects your wallet. Once you're connected, it shows how much you have available to watch. Click it for your address, your wallet's USDC, **Sign in**, **Get test USDC**, **View on explorer** and **Disconnect**. The sun and moon icon next to it switches between light and dark mode.
+The **Upload** button in the top right corner publishes a video. The button next to the sun and moon icon connects your wallet. Once you're connected, it shows how much you have available to watch. Click it for your address, your wallet's USDC, **Sign in**, **Get test USDC**, **View on explorer** and **Disconnect**. The sun and moon icon next to it switches between light and dark mode.
 
 ## Getting started
 
@@ -56,7 +57,7 @@ Watching doesn't need signing in. Adding funds is enough.
 
 ### Finding something to watch
 
-Open the catalog: click the PayPerWatch logo, then **Start watching** on the home page. You can also use **Browse** in the footer of any page.
+Open **Browse**.
 
 - **Categories:** All, Movies, Tutorials, Exclusive and Other.
 - **Search:** searches titles and descriptions.
