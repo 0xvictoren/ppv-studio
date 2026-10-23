@@ -2,6 +2,7 @@ import { getVideo, listVideos, updateVideo } from "@/lib/server/db";
 import { randomBytes } from "node:crypto";
 import {
   getHls,
+  getIndexEntry,
   getReview,
   listHlsIds,
   listIndexIds,
@@ -29,6 +30,10 @@ export async function GET(req: Request) {
   const origin = new URL(req.url).origin;
   const [queued, ids, videos] = await Promise.all([listQueuedReviews(), listIndexIds(), listVideos({ includeInactive: true })]);
   const indexed = new Set(ids.map((i) => i.id));
+  // Entries made by an older transcriber are redone (at most hourly, in case the worker is old too).
+  const stale = new Set(
+    ids.filter((i) => i.video_id && i.transcriber < TRANSCRIBER_VERSION && Date.now() - new Date(i.created_at).getTime() > RETRANSCRIBE_AFTER_MS).map((i) => i.id),
+  );
 
   const jobs = await Promise.all(
     queued.map(async (r) => ({
@@ -41,7 +46,7 @@ export async function GET(req: Request) {
   );
   const backfill = await Promise.all(
     videos
-      .filter((v) => !indexed.has(v.content_cid))
+      .filter((v) => !indexed.has(v.content_cid) || stale.has(v.content_cid))
       .slice(0, 5)
       .map(async (v) => ({
         id: v.content_cid,
@@ -65,15 +70,20 @@ export async function GET(req: Request) {
     await putHls(row);
     toPackage.push({ id: v.content_cid, videoId: v.id, title: v.title, key: row.key, downloadUrl: await workerDownloadUrl(v, origin) });
   }
-  return json({ jobs, backfill, package: toPackage, published: ids.filter((i) => i.video_id) });
+  return json({ jobs, backfill, package: toPackage, published: ids.filter((i) => i.video_id).map(({ id, video_id }) => ({ id, video_id })) });
 }
+
+/** Bump with worker/review_worker.py TRANSCRIBER_VERSION when transcripts get better: old ones are redone. */
+const TRANSCRIBER_VERSION = 2;
+const RETRANSCRIBE_AFTER_MS = 60 * 60 * 1000;
 
 const PACKAGING_RETRY_MS = 60 * 60 * 1000;
 
 type Entry = { frames: string; audio: string; transcript: string; segments: TranscriptSegment[] };
-type Body =
+type Body = { transcriber?: number } & (
   | { kind: "review"; id: string; entry?: Entry; duration?: number; result?: { verdict: "passed" | "held" | "blocked"; score: number; matches: ReviewMatch[] }; error?: string }
-  | { kind: "index"; id: string; videoId: string; entry?: Entry; duration?: number; error?: string };
+  | { kind: "index"; id: string; videoId: string; entry?: Entry; duration?: number; error?: string }
+);
 
 /** The worker's measured length in whole seconds, if it sent a sane one. */
 const measured = (d: unknown) => (typeof d === "number" && d > 0 && d < 7 * 24 * 3600 ? Math.round(d) : null);
@@ -84,12 +94,19 @@ const EMPTY: Entry = { frames: "", audio: "", transcript: "", segments: [] };
 export async function POST(req: Request) {
   if (!workerAuthorized(req)) return error("Unauthorized", 401);
   const body = (await req.json()) as Body;
+  const transcriber = typeof body.transcriber === "number" ? Math.round(body.transcriber) : 1;
 
   if (body.kind === "index") {
     const video = await getVideo(body.videoId);
     if (!video || video.content_cid !== body.id) return error("Video not found", 404);
+    const existing = await getIndexEntry(video.content_cid);
+    if (!body.entry && existing) {
+      // Redoing an indexed video failed: keep what it had, and don't hand it out again.
+      await putIndexEntry({ ...existing, transcriber: TRANSCRIBER_VERSION });
+      return json({ ok: true });
+    }
     // A video the worker couldn't read gets an empty entry, so it isn't retried forever.
-    await putIndexEntry({ id: video.content_cid, creator: video.creator, video_id: video.id, title: video.title, ...(body.entry ?? EMPTY) });
+    await putIndexEntry({ id: video.content_cid, creator: video.creator, video_id: video.id, title: video.title, ...(body.entry ?? EMPTY), transcriber });
     // Videos published before the check carry the length their creator typed in; use the real one.
     const duration = measured(body.duration);
     if (duration && duration !== video.duration_seconds) await updateVideo(video.id, { duration_seconds: duration });
@@ -104,7 +121,7 @@ export async function POST(req: Request) {
   }
   const { verdict, score, matches } = body.result;
   if (!["passed", "held", "blocked"].includes(verdict)) return error("Bad verdict");
-  await putIndexEntry({ id: review.id, creator: review.creator, video_id: null, title: review.title, ...body.entry });
+  await putIndexEntry({ id: review.id, creator: review.creator, video_id: null, title: review.title, ...body.entry, transcriber });
   const duration = measured(body.duration);
   await patchReview(review.id, {
     ...(duration ? { duration_seconds: duration } : {}),

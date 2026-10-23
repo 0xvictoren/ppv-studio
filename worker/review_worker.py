@@ -389,10 +389,16 @@ def download(url: str, dest: str):
             f.write(chunk)
 
 
+# Bump with TRANSCRIBER_VERSION in app/api/reviews/worker/route.ts when transcripts get better:
+# the site then hands out published videos with older transcripts to be redone.
+# 2: one language for the whole video, repetition loops dropped.
+TRANSCRIBER_VERSION = 2
+
+
 def process(site: Site, job: dict, kind: str, published: list[dict], model: Path, procs: int):
     log(f"{'checking' if kind == 'review' else 'indexing'} {job['title']!r}")
     tmp = tempfile.mkdtemp(prefix="ppw-review-")
-    body: dict = {"kind": kind, "id": job["id"]} | ({"videoId": job["videoId"]} if kind == "index" else {})
+    body: dict = {"kind": kind, "id": job["id"], "transcriber": TRANSCRIBER_VERSION} | ({"videoId": job["videoId"]} if kind == "index" else {})
     try:
         path = os.path.join(tmp, "video")
         download(job["downloadUrl"], path)

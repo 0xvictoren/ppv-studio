@@ -56,6 +56,8 @@ export type MediaIndexRow = {
   audio: string;
   transcript: string;
   segments: TranscriptSegment[];
+  /** Version of the worker's transcription that made `segments` (missing on old entries = 1). */
+  transcriber?: number;
   created_at: string;
 };
 
@@ -148,13 +150,21 @@ export async function listQueuedReviews(): Promise<ReviewRow[]> {
 
 // ------------------------------------------------------------------ media index
 
+type IndexId = { id: string; video_id: string | null; transcriber: number; created_at: string };
+
 /** Entry ids (and their video ids) without the heavy fingerprint fields. */
-export async function listIndexIds(): Promise<{ id: string; video_id: string | null }[]> {
+export async function listIndexIds(): Promise<IndexId[]> {
+  const brief = (r: Pick<MediaIndexRow, "video_id" | "transcriber" | "created_at">, id: string): IndexId => ({
+    id,
+    video_id: r.video_id ?? null,
+    transcriber: r.transcriber ?? 1,
+    created_at: r.created_at,
+  });
   if (mongoEnabled()) {
-    const docs = await (await col<WithId<MediaIndexRow>>("media_index")).find({}, { projection: { _id: 1, video_id: 1 } }).toArray();
-    return docs.map((d) => ({ id: d._id, video_id: d.video_id ?? null }));
+    const docs = await (await col<WithId<MediaIndexRow>>("media_index")).find({}, { projection: { _id: 1, video_id: 1, transcriber: 1, created_at: 1 } }).toArray();
+    return docs.map((d) => brief(d, d._id));
   }
-  return [...local().index.values()].map((r) => ({ id: r.id, video_id: r.video_id }));
+  return [...local().index.values()].map((r) => brief(r, r.id));
 }
 
 export async function getIndexEntry(id: string): Promise<MediaIndexRow | null> {
