@@ -290,6 +290,13 @@ export function WatchView({ id, embedded, backHref, refParam }: { id: string; em
         Connect wallet
       </Button>
     </Overlay>
+  ) : streamQ.isError && !streamQ.data ? (
+    <Overlay>
+      <p className="max-w-xs">{friendlyError(streamQ.error)}</p>
+      <Button variant="onImage" onClick={() => streamQ.refetch()}>
+        Try again
+      </Button>
+    </Overlay>
   ) : needsFunds && !fundsOpen ? (
     <Overlay>
       <p className="text-[17px] font-medium">Add funds to start watching</p>
