@@ -6,7 +6,8 @@ import { sessionAddress } from "@/lib/server/session";
 export const dynamic = "force-dynamic";
 
 /** GET -> { review }. The uploader polls this while the worker checks the video. */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await sessionAddress();
   if (!me) return error("Sign in with your wallet first.", 401);
   const review = await getReview(params.id);
@@ -15,7 +16,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 /** POST { note } on a held review: the creator explains what the video adds, which releases it. */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await sessionAddress();
   if (!me) return error("Sign in with your wallet first.", 401);
   const review = await getReview(params.id);

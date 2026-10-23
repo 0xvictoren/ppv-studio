@@ -2,7 +2,6 @@
 const nextConfig = {
   // Separate build output for the mock-mode test build (NEXT_DIST_DIR=.next-mock).
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  experimental: { instrumentationHook: true },
   async headers() {
     return [
       // The app itself must not be framed (clickjacking)…
@@ -30,6 +29,8 @@ const nextConfig = {
       "@x402/evm/exact/client": false,
       "@x402/evm/upto/client": false,
       "@x402/svm/exact/client": false,
+      // MetaMask SDK's React Native storage; browsers use localStorage.
+      "@react-native-async-storage/async-storage": false,
     };
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;

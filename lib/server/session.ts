@@ -14,8 +14,8 @@ const options = (): SessionOptions => ({
   cookieOptions: { secure: https, sameSite: https ? "none" : "lax", httpOnly: true, path: "/" },
 });
 
-export function getSession() {
-  return getIronSession<SessionData>(cookies(), options());
+export async function getSession() {
+  return getIronSession<SessionData>(await cookies(), options());
 }
 
 /** The signed-in wallet (lowercase), or null. */

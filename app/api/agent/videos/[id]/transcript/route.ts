@@ -13,7 +13,8 @@ export const maxDuration = 60;
  * Unpaid requests get 402 with Circle Gateway payment requirements. The price is what a person
  * pays to watch the whole video; the creator is paid through PayPerWatch settlement.
  */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Check everything before taking payment: the middleware settles before we respond.
   const video = await getVideo(params.id);
   if (!video || !video.active) return error("Video not found", 404);

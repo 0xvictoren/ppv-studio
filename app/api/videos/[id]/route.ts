@@ -6,7 +6,8 @@ import { sessionAddress } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const video = await getVideo(params.id);
   if (!video) return error("Video not found", 404);
   const sessions = await listWatchSessions({ videoId: video.id });
@@ -22,7 +23,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
  * PATCH: re-sync cached price/active from chain after the creator changes them onchain,
  * and/or set { referralsEnabled } (creator only).
  */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await sessionAddress();
   const video = await getVideo(params.id);
   if (!video) return error("Video not found", 404);

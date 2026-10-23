@@ -12,7 +12,8 @@ const TYPES: Record<string, string> = { mp4: "video/mp4", webm: "video/webm", mo
  * Serves locally stored videos with HTTP Range support so players can seek.
  * Requires a short-lived, viewer-bound stream token (?t=) from POST /api/stream.
  */
-export async function GET(req: Request, { params }: { params: { file: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ file: string }> }) {
+  const params = await props.params;
   const m = params.file.match(/^([0-9a-f-]{36})\.([a-z0-9]{2,4})$/);
   if (!m) return new Response("Not found", { status: 404 });
   const claim = verifyMedia(new URL(req.url).searchParams.get("t") ?? "", "stream");

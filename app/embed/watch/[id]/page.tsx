@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, use } from "react";
 import { WatchView } from "@/components/watch-view";
 
 function EmbeddedWatch({ id }: { id: string }) {
@@ -12,7 +12,8 @@ function EmbeddedWatch({ id }: { id: string }) {
   return <WatchView id={id} embedded backHref={backHref} refParam={sp.get("ref")} />;
 }
 
-export default function EmbedWatchPage({ params }: { params: { id: string } }) {
+export default function EmbedWatchPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   return (
     <Suspense>
       <EmbeddedWatch id={params.id} />

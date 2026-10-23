@@ -72,7 +72,7 @@ export type MeterState = {
 };
 
 export function useMeter(opts: {
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   viewer?: Address;
   creator?: Address;
   referrer?: Address;
