@@ -2,9 +2,19 @@
 
 PayPerWatch is video you pay for by the second, in USDC, only while it plays. Creators upload videos and set a price per hour. Viewers put a few dollars into the PayPerWatch contract once and then watch with no popups. Creators are paid straight to their wallet.
 
+<!-- if:agents -->
 This manual covers everything in the app: watching, paying, downloading, sharing, publishing, the dashboard, embedding PayPerWatch on another site, the paid API for AI agents, and running your own copy.
+<!-- end -->
+<!-- if:mainnet -->
+This manual covers everything in the app: watching, paying, downloading, sharing, publishing, the dashboard, embedding PayPerWatch on another site, and running your own copy.
+<!-- end -->
 
+<!-- if:testnet -->
 > PayPerWatch currently runs on **Arc Testnet**. The USDC is free test money from Circle's faucet, so nothing you do here costs real money.
+<!-- end -->
+<!-- if:mainnet -->
+> PayPerWatch runs on **Arc**, with real USDC. Only deposit what you plan to watch with. Anything you don't spend can be withdrawn.
+<!-- end -->
 
 ## The basics
 
@@ -28,10 +38,15 @@ This manual covers everything in the app: watching, paying, downloading, sharing
 | **Spendings** | Your balance, withdrawals, spending, referral earnings and history. |
 | **Browse** | Find videos to watch. |
 | **Downloads** | Videos you saved to watch offline. |
+<!-- if:agents -->
 | **Developers** | Embed codes for other websites, and the API for AI agents. |
+<!-- end -->
+<!-- if:mainnet -->
+| **Developers** | Embed codes for other websites. |
+<!-- end -->
 | **Manual** | This page. |
 
-The **Upload** button in the top right corner publishes a video. The button next to the sun and moon icon connects your wallet. Once you're connected, it shows how much you have available to watch. Click it for your address, your wallet's USDC, **Sign in**, **Get test USDC**, **View on explorer** and **Disconnect**. The sun and moon icon next to it switches between light and dark mode.
+The **Upload** button in the top right corner publishes a video. The button next to the sun and moon icon connects your wallet. Once you're connected, it shows how much you have available to watch. Click it for your address, your wallet's USDC, **Sign in**, **Get test USDC** (testnet only), **View on explorer** and **Disconnect**. The sun and moon icon next to it switches between light and dark mode.
 
 ## Getting started
 
@@ -41,11 +56,18 @@ Install a browser wallet such as MetaMask, Rabby or Coinbase Wallet, and create 
 
 ### 2. Connect
 
-Click **Connect wallet** in the top right corner and approve the connection in your wallet. PayPerWatch adds the Arc Testnet network to your wallet automatically. Approve that too if your wallet asks.
+Click **Connect wallet** in the top right corner and approve the connection in your wallet. PayPerWatch adds the Arc network to your wallet automatically. Approve that too if your wallet asks.
 
+<!-- if:testnet -->
 ### 3. Get test USDC
 
 Open the menu under your address and choose **Get test USDC**, or go to [faucet.circle.com](https://faucet.circle.com). Choose **Arc Testnet**, paste your wallet address and request USDC. It arrives within seconds.
+<!-- end -->
+<!-- if:mainnet -->
+### 3. Get USDC on Arc
+
+Send USDC to your wallet address on the **Arc** network, from an exchange or another wallet that supports Arc. On Arc, USDC also pays the network fee, so keep a few cents extra.
+<!-- end -->
 
 ### 4. Sign in (only when needed)
 
@@ -115,10 +137,12 @@ There are no like buttons. Ratings come from how people actually watch:
 
 The watch page shows the rating, how many people rated it, the share of viewers who finish it, and the share who come back.
 
+<!-- if:review -->
 ### How streaming is protected
 
 Most videos are delivered in encrypted pieces of about 6 seconds each. Your player only gets the key for a piece once you've paid for it, or while it's within a short buffer of about a minute ahead of where you're watching. You won't notice anything while watching. It just means a video can't be saved from the page without paying for it.
 
+<!-- end -->
 ## Downloads (watch offline)
 
 1. On a video's page, click **Download**.
@@ -231,11 +255,14 @@ Turn this on to let viewers earn 5% (paid from your share) for bringing in new v
 Click **Publish**. The button shows each stage:
 
 1. **Uploading.** A progress bar. If a later step fails, the upload is kept, so trying again doesn't upload the file again.
+<!-- if:review -->
 2. **Checking originality.** The video is compared with every video on PayPerWatch. Long videos can take a few minutes, so keep the tab open.
+<!-- end -->
 3. **Confirm in wallet.** Your wallet asks you to confirm one transaction, which registers the video and its price on the contract.
 4. **Pending, then Saving.** There's a link to the transaction while it confirms.
 5. **Your video is live.** Links to the video, your dashboard and the transaction. If the video got an originality score, it's shown here too.
 
+<!-- if:review -->
 ### The originality check
 
 Every upload gets an originality score from 0 to 100. The check compares:
@@ -253,6 +280,7 @@ There are three possible outcomes:
 
 Each matching video shows how much it overlaps, as either "same footage" or "same topic".
 
+<!-- end -->
 ## Your dashboard (creators)
 
 Open **Dashboard** and sign in.
@@ -314,6 +342,7 @@ Open **Developers** for ready-to-copy code and a live preview. Everything runs i
 - Signing in to upload from inside a frame needs third-party cookies over https. If a browser blocks them, the frame offers to open in a new tab.
 - Downloads open in the full PayPerWatch app.
 
+<!-- if:agents -->
 ## AI agents: paid transcripts
 
 AI agents can search everything said in PayPerWatch videos and buy full transcripts, paying in USDC through Circle Gateway nanopayments (the x402 standard). The creator is paid for every purchase, just like when a person watches.
@@ -353,6 +382,7 @@ To try it from this repository:
 3. Run `npx tsx scripts/agent-demo.ts deposit 1` to fund its Gateway balance.
 4. Run `npx tsx scripts/agent-demo.ts ask "fibonacci retracement"`.
 
+<!-- end -->
 ## Running your own PayPerWatch
 
 This section is for whoever operates the site. Viewers and creators can skip it.
@@ -365,7 +395,7 @@ This section is for whoever operates the site. Viewers and creators can skip it.
 | **Database** | MongoDB Atlas, or a file in `./data` when self-hosted | Videos, receipts, watch progress, reviews and transcripts. |
 | **Video storage** | Cloudflare R2, or `./data/uploads` | The uploaded files and the encrypted streaming pieces. |
 | **Review worker** | Any computer with ffmpeg (`python worker/review_worker.py`) | Originality checks, transcripts, and encrypting published videos for streaming. |
-| **Contract** | Arc (testnet for now) | Holds balances, pays creators, and enforces fees and withdrawal delays. |
+| **Contract** | Arc | Holds balances, pays creators, and enforces fees and withdrawal delays. |
 
 Setup steps and environment variables are in `README.md`.
 
@@ -375,6 +405,7 @@ Setup steps and environment variables are in `README.md`.
 - **Start it:** `python worker/review_worker.py`. It reads `REVIEW_WORKER_SECRET` and the site address from `.env.local`.
 - **Configuration:** `WHISPER_MODEL` (default `worker/models/ggml-base.bin`) and `WHISPER_PROCS` (parallel transcription, default 4).
 - **When it's off:** uploads wait at "Checking originality", and new videos stream without encryption until it's back. Keep it running.
+- **Switching it off:** set `CONTENT_REVIEW=off` and redeploy. Uploads then publish without the originality check, no transcripts are made, and videos stream as plain files. It's off by default on mainnet; set `CONTENT_REVIEW=on` once a worker runs around the clock.
 
 ### Settlement (paying creators)
 
@@ -396,11 +427,17 @@ Setup steps and environment variables are in `README.md`.
 
 ## Troubleshooting
 
+<!-- if:testnet -->
 **My wallet doesn't show Arc Testnet.**
 Disconnect and connect again. PayPerWatch offers to add the network. You can also add it by hand: chain ID 5042002, with USDC as the currency.
+<!-- end -->
+<!-- if:mainnet -->
+**My wallet doesn't show Arc.**
+Disconnect and connect again. PayPerWatch offers to add the network. You can also add it by hand: chain ID 5042, RPC `https://rpc.mainnet.arc.io`, with USDC as the currency.
+<!-- end -->
 
 **I can't add funds: "Not enough USDC in your wallet".**
-Get test USDC from the faucet, and keep a few cents in your wallet for network fees.
+Get more USDC into your wallet (on testnet, from the faucet), and keep a few cents for network fees.
 
 **The video won't start.**
 Check the message on the player. You may need to connect your wallet, add funds, or wait for the creator to republish the video. If your session key has expired (after 24 hours), adding funds creates a new one.
@@ -411,11 +448,13 @@ Choose **Watched it before? Sign in** on the player so PayPerWatch can load your
 **My withdrawal says it isn't ready.**
 Withdrawals are ready 24 hours after you request them. The card shows the countdown.
 
+<!-- if:review -->
 **My upload is stuck on "Checking originality".**
 The review worker may be offline. Keep the tab open, or come back and publish again later. Your upload is kept.
 
 **"This video matches one already on PayPerWatch".**
 The picture or sound matches an existing video, so it can't be published. If it's your original, contact the PayPerWatch team with proof.
+<!-- end -->
 
 **I don't see my earnings yet.**
 Earnings show under **Pending** until the next settlement, then move to **Earned**. Check **Settlements** on your dashboard for the transaction.

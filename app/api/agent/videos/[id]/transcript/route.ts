@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { env } from "@/lib/env";
+import { agentApiEnabled, env } from "@/lib/env";
 import { creditCreator, requirePayment, transcriptPrice } from "@/lib/server/agent-pay";
 import { getIndexByVideo } from "@/lib/server/content-db";
 import { getVideo } from "@/lib/server/db";
@@ -14,6 +14,7 @@ export const maxDuration = 60;
  * pays to watch the whole video; the creator is paid through PayPerWatch settlement.
  */
 export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  if (!agentApiEnabled) return error("The agent API isn't available on this network yet.", 404);
   const params = await props.params;
   // Check everything before taking payment: the middleware settles before we respond.
   const video = await getVideo(params.id);

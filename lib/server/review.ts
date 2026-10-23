@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { isMock } from "../env";
+import { isMock, isTestnet } from "../env";
 import type { VideoRow } from "./db";
 import { storageRef } from "./media";
 import { presignRead } from "./r2";
@@ -11,15 +11,21 @@ import { signMedia } from "./upload-token";
 // A video can only be published once its review passed, or was held and the creator explained
 // what it adds. Copies are blocked.
 
-/** Off in mock mode (tests) or with CONTENT_REVIEW=off. */
+/**
+ * Off in mock mode (tests). CONTENT_REVIEW=on|off sets it; unset means on for testnet and off for
+ * mainnet, where no worker runs yet. Off: uploads publish without the originality check, no
+ * transcripts are made and videos stream as plain files instead of encrypted HLS.
+ */
 export function reviewEnabled() {
-  return !isMock && process.env.CONTENT_REVIEW !== "off";
+  if (isMock) return false;
+  const v = process.env.CONTENT_REVIEW;
+  return v === "on" ? true : v === "off" ? false : isTestnet;
 }
 
-/** The worker authenticates with `Authorization: Bearer $REVIEW_WORKER_SECRET`. */
+/** The worker authenticates with `Authorization: Bearer $REVIEW_WORKER_SECRET`. Refused while review is off. */
 export function workerAuthorized(req: Request) {
   const secret = process.env.REVIEW_WORKER_SECRET;
-  if (!secret) return false;
+  if (!secret || !reviewEnabled()) return false;
   const digest = (s: string) => createHash("sha256").update(s).digest();
   return timingSafeEqual(digest(req.headers.get("authorization") ?? ""), digest(`Bearer ${secret}`));
 }

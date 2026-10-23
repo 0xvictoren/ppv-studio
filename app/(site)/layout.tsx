@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Header } from "@/components/header";
+import { isTestnet } from "@/lib/env";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,11 +17,11 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         <div className="container grid gap-8 py-12 text-sm text-muted-foreground md:grid-cols-[2fr_1fr_1fr_1fr]">
           <div>
             <p className="font-medium text-foreground">PayPerWatch</p>
-            <p className="mt-2 max-w-xs">Pay by the second, in USDC, only while the video plays. Running on Arc Testnet.</p>
+            <p className="mt-2 max-w-xs">Pay by the second, in USDC, only while the video plays. Running on {isTestnet ? "Arc Testnet" : "Arc"}.</p>
           </div>
           <FooterCol title="Watch" links={[["Browse", "/videos"], ["Spendings", "/wallet"], ["How billing works", "/about"], ["Manual", "/manual"]]} />
           <FooterCol title="Create" links={[["Upload", "/upload"], ["Dashboard", "/dashboard"]]} />
-          <FooterCol title="Build" links={[["Embed on your site", "/developers"], ["Contract", "/about#contract"]]} />
+          <FooterCol title="Build" links={[["Embed on your site", "/developers"], ["Contract", "/about#contract"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
         </div>
       </footer>
     </>

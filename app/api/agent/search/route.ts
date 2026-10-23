@@ -1,4 +1,4 @@
-import { env } from "@/lib/env";
+import { agentApiEnabled, env } from "@/lib/env";
 import { formatUsdc } from "@/lib/money";
 import { transcriptPrice } from "@/lib/server/agent-pay";
 import { error, json } from "@/lib/server/http";
@@ -26,6 +26,7 @@ function limited(req: Request): boolean {
  * moments that matched and the price of the full transcript at /api/agent/videos/{id}/transcript.
  */
 export async function GET(req: Request) {
+  if (!agentApiEnabled) return error("The agent API isn't available on this network yet.", 404);
   if (limited(req)) return json({ error: "Too many searches. Try again in a minute." }, { status: 429, headers: { "retry-after": "60" } });
   const url = new URL(req.url);
   const q = url.searchParams.get("q")?.trim().slice(0, 200);

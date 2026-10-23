@@ -5,7 +5,7 @@ import { StatsStrip } from "@/components/stats-strip";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { CATEGORIES } from "@/lib/categories";
-import { env } from "@/lib/env";
+import { env, isTestnet } from "@/lib/env";
 import { HERO_PHOTO, REELS_PHOTO } from "@/lib/unsplash";
 
 const STEPS = [
@@ -20,8 +20,10 @@ const FAQ = [
   ["Do I pay again if I rewatch?", "No. You pay for each second of a video once. Come back after a break and billing picks up where new footage starts. Finish a video and replays are free for 30 days."],
   ["Can I download videos?", "Yes, inside the app, to watch offline. You pay only the part you haven't watched yet, and you can delete and re-download it free for 30 days."],
   ["When do creators get paid?", "As you watch: payments settle onchain when a viewer reaches 10%, 25%, 50%, 75% and 100% of a video, plus a sweep every hour. Earnings go straight to the creator's wallet, minus a 5% platform fee."],
-  ["Can I get my money back?", "Anything you haven't watched stays in your balance. Request a withdrawal and it's ready an hour later, once your last minutes are settled."],
-  ["Is this real money?", "PayPerWatch currently runs on Arc Testnet with free test USDC from Circle's faucet. Nothing you do here costs real money."],
+  ["Can I get my money back?", "Anything you haven't watched stays in your balance. Request a withdrawal and it's ready 24 hours later, once your last minutes are settled."],
+  isTestnet
+    ? ["Is this real money?", "PayPerWatch currently runs on Arc Testnet with free test USDC from Circle's faucet. Nothing you do here costs real money."]
+    : ["Is this real money?", "Yes. PayPerWatch runs on Arc mainnet with real USDC. Only deposit what you plan to watch with; anything unspent can be withdrawn."],
 ];
 
 export default function Home() {

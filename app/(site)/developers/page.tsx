@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CopyCode } from "@/components/copy-code";
 import { PageTitle } from "@/components/ui/primitives";
-import { env, isTestnet } from "@/lib/env";
+import { agentApiEnabled, env, isTestnet } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Embed on your site" };
 
@@ -86,6 +86,7 @@ console.log(data.transcript);`;
         </ul>
       </section>
 
+      {agentApiEnabled && (
       <section aria-labelledby="agents" className="mt-20 border-t pt-12">
         <h2 id="agents" className="text-[20px] font-semibold">
           For AI agents
@@ -107,6 +108,7 @@ console.log(data.transcript);`;
           <CopyCode code={agentPay} />
         </div>
       </section>
+      )}
 
       <section aria-labelledby="preview" className="mt-20">
         <h2 id="preview" className="text-[20px] font-semibold">

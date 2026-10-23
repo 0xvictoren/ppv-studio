@@ -1,4 +1,4 @@
-// PayPerWatch v4 ABI (fee timelock, pull-based platform fees, adjustable withdraw delay) — generated from contracts/abi/PayPerWatch.json.
+// PayPerWatch v4 ABI (fee timelock with cancel, pull-based platform fees, adjustable withdraw delay) — generated from contracts/abi/PayPerWatch.json.
 // To update: replace the array with the new ABI JSON and keep the `as const`.
 export const ppwAbi = [
   {
@@ -264,6 +264,20 @@ export const ppwAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "cancelFeeProposal",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelReferralProposal",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1057,6 +1071,19 @@ export const ppwAbi = [
   },
   {
     "type": "event",
+    "name": "FeeProposalCancelled",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "FeeProposed",
     "inputs": [
       {
@@ -1203,6 +1230,19 @@ export const ppwAbi = [
         "type": "uint128",
         "indexed": false,
         "internalType": "uint128"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ReferralBpsProposalCancelled",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
       }
     ],
     "anonymous": false

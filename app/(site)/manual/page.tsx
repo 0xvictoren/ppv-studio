@@ -3,7 +3,8 @@ import path from "node:path";
 import type { Metadata } from "next";
 import { headings, Markdown } from "@/components/markdown";
 import { PageTitle } from "@/components/ui/primitives";
-import { env } from "@/lib/env";
+import { agentApiEnabled, env, isTestnet } from "@/lib/env";
+import { reviewEnabled } from "@/lib/server/review";
 
 export const metadata: Metadata = { title: "Manual" };
 // Built once from MANUAL.md at the repo root, the single source for this page.
@@ -11,7 +12,7 @@ export const dynamic = "force-static";
 
 export default function ManualPage() {
   // The manual names the public site; show this deployment's own address instead.
-  const source = readFileSync(path.join(process.cwd(), "MANUAL.md"), "utf8").replaceAll("https://ppv-studio.vercel.app", env.appUrl);
+  const source = forThisSite(readFileSync(path.join(process.cwd(), "MANUAL.md"), "utf8")).replaceAll("https://ppv-studio.vercel.app", env.appUrl);
   const toc = headings(source);
   return (
     <div className="container">
@@ -35,4 +36,10 @@ export default function ManualPage() {
       </div>
     </div>
   );
+}
+
+/** Keeps the `<!-- if:name -->…<!-- end -->` blocks that apply to this deployment and drops the rest. */
+function forThisSite(md: string) {
+  const on: Record<string, boolean> = { testnet: isTestnet, mainnet: !isTestnet, review: reviewEnabled(), agents: agentApiEnabled };
+  return md.replace(/<!-- if:(\w+) -->\r?\n([\s\S]*?)<!-- end -->(\r?\n)?/g, (_, name: string, body: string) => (on[name] ? body : ""));
 }

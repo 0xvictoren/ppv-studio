@@ -10,7 +10,7 @@ import { useEscrow } from "@/lib/client/hooks";
 import { usdcAllowance } from "@/lib/client/ppw";
 import { newSessionKey, rememberSessionKey } from "@/lib/client/session-key";
 import { useTx } from "@/lib/client/tx";
-import { env, isTestnet } from "@/lib/env";
+import { depositCap, env, isTestnet } from "@/lib/env";
 import { formatUsdc, ONE_USDC, parseUsdc } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +44,12 @@ export function AddFundsDialog({
   const value = custom ? customAmount : amount;
   const wallet = escrow.data?.wallet;
   const tooMuch = value !== null && wallet !== undefined && value > wallet;
+  // Soft-launch limit on what one wallet keeps in the contract. Enforced here only, not onchain.
+  const room = depositCap > 0n ? depositCap - (escrow.data?.balance ?? 0n) : null;
+  const overCap = room !== null && value !== null && value > room;
 
   async function submit() {
-    if (!address || !value || value <= 0n) return;
+    if (!address || !value || value <= 0n || overCap) return;
     // The session key may spend everything that will be in escrow after this deposit.
     const cap = (escrow.data?.balance ?? 0n) + value;
     const key = newSessionKey(cap);
@@ -111,6 +114,12 @@ export function AddFundsDialog({
             : `In your wallet: ${wallet !== undefined ? formatUsdc(wallet) : "…"}`}
         </p>
       </div>
+      {overCap && (
+        <p className="mt-1 text-[13px] text-destructive">
+          While we&apos;re launching, a balance can be at most {formatUsdc(depositCap)}.{" "}
+          {room! > 0n ? `You can add up to ${formatUsdc(room!)}.` : "Watch some of your balance first."}
+        </p>
+      )}
       {tooMuch && (
         <p className="mt-1 text-[13px] text-destructive">
           Not enough USDC in your wallet.{" "}
@@ -121,7 +130,7 @@ export function AddFundsDialog({
           )}
         </p>
       )}
-      <Button className="mt-5 w-full" size="lg" disabled={!value || value <= 0n || tooMuch || tx.busy} onClick={submit}>
+      <Button className="mt-5 w-full" size="lg" disabled={!value || value <= 0n || tooMuch || overCap || tx.busy} onClick={submit}>
         {tx.label(value ? `Add ${formatUsdc(value)}` : "Add funds")}
       </Button>
       <p className="mt-4 text-center text-[13px] text-muted-foreground">One confirmation starts a 24-hour watch session with no further popups.</p>

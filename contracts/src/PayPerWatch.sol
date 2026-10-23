@@ -127,6 +127,10 @@ contract PayPerWatch is EIP712, Ownable2Step, Pausable, ReentrancyGuard {
     event WithdrawDelayUpdated(uint64 newDelay);
     /// @notice Emitted when accrued fees are pulled to feeRecipient.
     event FeesWithdrawn(address indexed recipient, uint256 amount);
+    /// @notice Emitted when a pending fee proposal is cancelled by the owner before it is applied.
+    event FeeProposalCancelled(uint16 bps);
+    /// @notice Emitted when a pending referral-rate proposal is cancelled by the owner before it is applied.
+    event ReferralBpsProposalCancelled(uint16 bps);
 
     // =========================================================================
     // Constants
@@ -439,57 +443,125 @@ contract PayPerWatch is EIP712, Ownable2Step, Pausable, ReentrancyGuard {
     /// @notice Propose a new platform fee. Takes effect after FEE_TIMELOCK (48 h) via applyFee().
     ///         Kept as setFee() in addition to proposeFee() for backward ABI compatibility.
     ///         Note: unlike v3 setFee(), this no longer applies immediately. Callers must call applyFee().
+    ///         Reverts PendingProposalExists if a fee proposal is already pending (must apply or let it expire first).
     function proposeFee(uint16 bps) external onlyOwner {
         if (bps > 1000) revert FeeTooHigh();
         if (uint256(bps) + referralBps > MAX_COMBINED_BPS) revert CombinedFeeTooHigh();
+        // H-1 fix (part): also validate against any pending referral proposal to prevent
+        //                  combined cap bypass via two concurrent proposals.
+        if (pendingReferralApplicableAt != 0 && uint256(bps) + pendingReferralBps > MAX_COMBINED_BPS) {
+            revert CombinedFeeTooHigh();
+        }
+        // M-1 fix: reject if a fee proposal is already queued and unexpired.
+        if (pendingFeeApplicableAt != 0 && block.timestamp < pendingFeeApplicableAt) {
+            revert PendingProposalExists();
+        }
         pendingFeeBps = bps;
         pendingFeeApplicableAt = uint64(block.timestamp) + FEE_TIMELOCK;
         emit FeeProposed(bps, pendingFeeApplicableAt);
     }
 
     /// @notice Backward-compatible alias for proposeFee. Does NOT apply immediately.
+    ///         Reverts PendingProposalExists if a fee proposal is already pending.
     function setFee(uint16 bps) external onlyOwner {
         if (bps > 1000) revert FeeTooHigh();
         if (uint256(bps) + referralBps > MAX_COMBINED_BPS) revert CombinedFeeTooHigh();
+        // H-1 fix (part): validate against pending referral proposal.
+        if (pendingReferralApplicableAt != 0 && uint256(bps) + pendingReferralBps > MAX_COMBINED_BPS) {
+            revert CombinedFeeTooHigh();
+        }
+        // M-1 fix.
+        if (pendingFeeApplicableAt != 0 && block.timestamp < pendingFeeApplicableAt) {
+            revert PendingProposalExists();
+        }
         pendingFeeBps = bps;
         pendingFeeApplicableAt = uint64(block.timestamp) + FEE_TIMELOCK;
         emit FeeProposed(bps, pendingFeeApplicableAt);
     }
 
     /// @notice Apply the pending fee after the timelock has expired.
+    ///         H-1 fix: re-checks the combined cap against the current referralBps at apply time.
     function applyFee() external {
         if (pendingFeeApplicableAt == 0) revert InvalidAmount();
         if (block.timestamp < pendingFeeApplicableAt) revert TimelockNotExpired();
+        // H-1 fix: enforce combined cap at apply time in case referralBps changed since proposal.
+        if (uint256(pendingFeeBps) + referralBps > MAX_COMBINED_BPS) revert CombinedFeeTooHigh();
         feeBps = pendingFeeBps;
+        pendingFeeBps = 0;          // clear stale pending value
         pendingFeeApplicableAt = 0;
         emit FeeUpdated(feeBps);
     }
 
     /// @notice Propose a new referral rate. Takes effect after FEE_TIMELOCK via applyReferralBps().
+    ///         Reverts PendingProposalExists if a referral proposal is already pending.
     function proposeReferralBps(uint16 bps) external onlyOwner {
         if (bps > MAX_REFERRAL_BPS) revert ReferralTooHigh();
         if (uint256(feeBps) + bps > MAX_COMBINED_BPS) revert CombinedFeeTooHigh();
+        // H-1 fix (part): also validate against any pending fee proposal.
+        if (pendingFeeApplicableAt != 0 && uint256(pendingFeeBps) + bps > MAX_COMBINED_BPS) {
+            revert CombinedFeeTooHigh();
+        }
+        // M-1 fix: reject if a referral proposal is already queued and unexpired.
+        if (pendingReferralApplicableAt != 0 && block.timestamp < pendingReferralApplicableAt) {
+            revert PendingProposalExists();
+        }
         pendingReferralBps = bps;
         pendingReferralApplicableAt = uint64(block.timestamp) + FEE_TIMELOCK;
         emit ReferralBpsProposed(bps, pendingReferralApplicableAt);
     }
 
     /// @notice Backward-compatible alias for proposeReferralBps. Does NOT apply immediately.
+    ///         Reverts PendingProposalExists if a referral proposal is already pending.
     function setReferralBps(uint16 bps) external onlyOwner {
         if (bps > MAX_REFERRAL_BPS) revert ReferralTooHigh();
         if (uint256(feeBps) + bps > MAX_COMBINED_BPS) revert CombinedFeeTooHigh();
+        // H-1 fix (part): validate against pending fee proposal.
+        if (pendingFeeApplicableAt != 0 && uint256(pendingFeeBps) + bps > MAX_COMBINED_BPS) {
+            revert CombinedFeeTooHigh();
+        }
+        // M-1 fix.
+        if (pendingReferralApplicableAt != 0 && block.timestamp < pendingReferralApplicableAt) {
+            revert PendingProposalExists();
+        }
         pendingReferralBps = bps;
         pendingReferralApplicableAt = uint64(block.timestamp) + FEE_TIMELOCK;
         emit ReferralBpsProposed(bps, pendingReferralApplicableAt);
     }
 
     /// @notice Apply the pending referral rate after the timelock has expired.
+    ///         H-1 fix: re-checks the combined cap against current feeBps at apply time.
     function applyReferralBps() external {
         if (pendingReferralApplicableAt == 0) revert InvalidAmount();
         if (block.timestamp < pendingReferralApplicableAt) revert TimelockNotExpired();
+        // H-1 fix: enforce combined cap at apply time in case feeBps changed since proposal.
+        if (uint256(feeBps) + pendingReferralBps > MAX_COMBINED_BPS) revert CombinedFeeTooHigh();
         referralBps = pendingReferralBps;
+        pendingReferralBps = 0;     // clear stale pending value
         pendingReferralApplicableAt = 0;
         emit ReferralBpsUpdated(referralBps);
+    }
+
+    /// @notice Cancel a pending fee proposal before it can be applied.
+    ///         Useful when the owner discovers a typo or wishes to replace the proposal after the
+    ///         M-1 guard blocks a direct overwrite. After cancellation the owner may immediately
+    ///         propose a new value.
+    ///         Reverts InvalidAmount if no fee proposal is currently pending.
+    function cancelFeeProposal() external onlyOwner {
+        if (pendingFeeApplicableAt == 0) revert InvalidAmount();
+        uint16 cancelled = pendingFeeBps;
+        pendingFeeBps = 0;
+        pendingFeeApplicableAt = 0;
+        emit FeeProposalCancelled(cancelled);
+    }
+
+    /// @notice Cancel a pending referral-rate proposal before it can be applied.
+    ///         Reverts InvalidAmount if no referral proposal is currently pending.
+    function cancelReferralProposal() external onlyOwner {
+        if (pendingReferralApplicableAt == 0) revert InvalidAmount();
+        uint16 cancelled = pendingReferralBps;
+        pendingReferralBps = 0;
+        pendingReferralApplicableAt = 0;
+        emit ReferralBpsProposalCancelled(cancelled);
     }
 
     /// @notice Update the fee recipient address immediately (no timelock needed — does not affect rates).
@@ -520,6 +592,9 @@ contract PayPerWatch is EIP712, Ownable2Step, Pausable, ReentrancyGuard {
 
     function _settle(Receipt calldata r, bytes calldata sig) internal {
         if (block.timestamp > r.deadline) revert ReceiptExpired();
+        // L-1 fix: reject zero creator early with a clear error rather than reverting
+        // inside safeTransfer (which would produce a confusing ERC20 error in settleBatch).
+        if (r.creator == address(0)) revert ZeroAddress();
 
         bytes32 digest = hashReceipt(r);
 

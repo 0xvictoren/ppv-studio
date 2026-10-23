@@ -50,3 +50,6 @@ next-env.d.ts
 __pycache__/
 /.smoke-data/
 /.next-local/
+
+# Arc Studio CLI pull state
+.arc-studio/

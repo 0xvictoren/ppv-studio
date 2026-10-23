@@ -20,11 +20,26 @@ export const env = {
   legacyContracts: (process.env.NEXT_PUBLIC_PPW_LEGACY_CONTRACTS ?? "0xfff200a3921d18ae09616901a1aaf9434ce693e7,0xdde5bd885455291429ae262a06d1aabaddf1c89b,0x5ce5d5b34a09a0406b4b9c2e9da7ffafb006d51d")
     .split(",")
     .map((a) => a.trim())
-    .filter(Boolean) as Address[],
+    .filter((a) => /^0x[0-9a-fA-F]{40}$/.test(a)) as Address[], // "none" = no earlier deployments
 };
 
 export const isMock = env.mockMode;
 export const isTestnet = env.chainId === 5042002;
+
+/** Off unless the variable is "on"/"off"; unset falls back to the network default. */
+function flag(v: string | undefined, fallback: boolean) {
+  return v === "on" ? true : v === "off" ? false : fallback;
+}
+
+/**
+ * Paid transcripts for AI agents (Circle Gateway nanopayments). Gateway doesn't support
+ * nanopayments on Arc mainnet yet, and transcripts come from the review worker, so this
+ * defaults to testnet only. NEXT_PUBLIC_AGENT_API=on|off overrides.
+ */
+export const agentApiEnabled = flag(process.env.NEXT_PUBLIC_AGENT_API, isTestnet);
+
+/** Most a wallet can hold in PayPerWatch while we soft-launch, in USDC (6 decimals). 0 = no cap. */
+export const depositCap = BigInt(Math.round(Number(process.env.NEXT_PUBLIC_DEPOSIT_CAP_USDC ?? 0) * 1e6) || 0);
 
 export function explorerTx(hash: string) {
   if (isMock) return null;
