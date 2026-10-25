@@ -33,5 +33,25 @@
         "deployTx": "0x1d7bee340f88fd0173d222536c0f81a020bb625adc9b6224feadd3bff87f043d"
       }
     }
+  },
+  "arcMainnet": {
+    "chainId": 5042,
+    "rpc": "https://rpc.mainnet.arc.io",
+    "explorer": "https://explorer.arc.io",
+    "usdc": "0x3600000000000000000000000000000000000000",
+    "PayPerWatch": {
+      "v4": {
+        "address": "0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4",
+        "deployTx": "0x2374c2d023d33ee7ebda411549b5abf9e742253c6efdf511049e477b9caca237",
+        "deployBlock": 27732474,
+        "eip712Version": "4",
+        "feeBps": 500,
+        "referralBps": 500,
+        "withdrawDelaySeconds": 86400,
+        "owner": "0x85a5f7C46C86DD219757ec381dfDf2bB72Fa8c98",
+        "sourceKeccak256": "0x5c62883f1c915068aa104307892393d54f10e4fcee61c2d25eeeae83ac14b843",
+        "audit": "contracts/docs/security-review-v4.md"
+      }
+    }
   }
 }
