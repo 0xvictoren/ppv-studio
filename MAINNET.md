@@ -2,7 +2,7 @@
 
 This is the checklist for running PayPerWatch with real USDC. Do the steps in order. Nothing here is automatic, and no step should be skipped because the testnet site works.
 
-Mainnet runs as a **separate deployment** next to the testnet site, with its own Vercel project, database, storage bucket and keys. The testnet site stays as the staging copy, where changes are tried first.
+**How it's set up (decided 2026-10-25):** the `main` branch is mainnet and runs on the existing Vercel project, MongoDB and R2 bucket. The `testnet` branch keeps the testnet version of the code. The current wallet (`0x85a5…8c98`, `SETTLER_PRIVATE_KEY`) is the contract owner, fee recipient and settler. That's simpler, but if the server key ever leaks, the attacker also controls the contract (pause, fees, withdrawal wait). Moving ownership to a hardware wallet later is one `transferOwnership` call plus `acceptOwnership`.
 
 ## What's different on mainnet
 
@@ -12,55 +12,60 @@ Mainnet runs as a **separate deployment** next to the testnet site, with its own
 | Review worker (originality check, transcripts, encrypted streaming) | On | **Off** (`CONTENT_REVIEW=off`) until a worker runs around the clock |
 | Paid agent transcripts | On | **Off** (`NEXT_PUBLIC_AGENT_API=off`): Circle Gateway nanopayments aren't on Arc mainnet yet, and there are no transcripts while the worker is off |
 | Deposit limit | None | $50 per wallet while soft-launching (`NEXT_PUBLIC_DEPOSIT_CAP_USDC`), enforced in the app |
-| Contract owner | Settler hot key | A hardware wallet or Safe multisig. Never the settler key |
+| Contract owner | `0x85a5…8c98` | The same wallet, by choice (see above) |
 | Settlement sweep | Daily (Vercel cron) | Hourly (cron-job.org) |
 
 With the worker off, uploads publish straight away without an originality score, and videos stream as plain files behind short-lived signed links instead of encrypted pieces. A paying viewer could save the file. That's the trade-off until the worker comes back.
 
-## 1. Accounts and money
+## 1. Fund the wallet
 
-- **Vercel Pro** for the mainnet project. The free plan doesn't allow commercial use.
-- **MongoDB Atlas**: a new project or cluster for mainnet. Back it up (paid tiers have scheduled backups).
-- **Cloudflare R2**: a new bucket, with a CORS rule allowing `GET` from the mainnet site address.
-- **A domain** (recommended) instead of a `*.vercel.app` address.
+Send USDC on the **Arc** network to `0x85a5f7C46C86DD219757ec381dfDf2bB72Fa8c98` (the owner, fee recipient and settler). $10 covers the deploy (about $0.10) and months of settlement gas. Top it up when `/api/health` warns.
 
 ## 2. Keys
 
-Create every key new. Never reuse a testnet key on mainnet.
-
-| Key | Who holds it | What it does | Funds |
-|---|---|---|---|
-| **Owner** | You, in a hardware wallet or a Safe multisig (check that Safe supports Arc mainnet first) | Pauses the contract, changes fees and the withdrawal wait, sets the fee recipient | A few dollars of USDC for gas |
-| **Fee recipient** | You (can be the owner) | Receives the 5% platform fee | — |
-| **Settler** (`SETTLER_PRIVATE_KEY`) | The server only | Sends viewers' signed receipts onchain. Can't take funds or change settings | $5–20 USDC for gas. Top up when `/api/health` warns |
-
-To make a new hot key for the settler: `node -e "console.log(require('viem/accounts').generatePrivateKey())"`, then put it straight into Vercel and nowhere else.
+No new keys. `SETTLER_PRIVATE_KEY` stays as it is. `AGENT_PRIVATE_KEY` and `REVIEW_WORKER_SECRET` aren't used on mainnet while those features are off.
 
 ## 3. The contract
 
-1. **Audit.** The v4 contract is reviewed by Arc Studio (max preset). Fix anything critical, high or medium, and re-run the Foundry tests. An outside audit is strongly recommended before deposits grow.
-2. **Deploy through Arc Studio** to Arc mainnet with: `USDC_ADDRESS=0x3600000000000000000000000000000000000000`, `FEE_BPS=500`, `FEE_RECIPIENT=<fee wallet>`, `INITIAL_OWNER=<owner wallet>`. Only with the owner's explicit go-ahead.
-3. Record the address, deploy transaction and block in `contracts/deployments.json` under `arcMainnet`.
-4. Check the contract on the explorer (https://explorer.arc.io): owner, fee recipient, USDC, 5% fee, 24-hour withdrawal wait.
+1. **Audit.** Arc Studio reviewed v4 with the max preset and fixed what it found (`contracts/docs/security-review-v4.md`, 130 tests). An outside audit is still recommended before deposits grow.
+2. **Deploy from your own wallet.** Arc Studio doesn't send mainnet transactions, so the deploy uses Arc Studio's audited build (`contracts/artifacts/PayPerWatch.json`). The script refuses to run if `contracts/src/PayPerWatch.sol` differs from that build:
+   ```
+   npx tsx scripts/deploy-mainnet.ts            # dry run
+   npx tsx scripts/deploy-mainnet.ts --confirm  # deploys, about $0.10 of USDC gas
+   ```
+   It checks owner, fee recipient, USDC, 5% fee, 24-hour wait and the EIP-712 domain, then writes the address and block to `contracts/deployments.json`. The app reads its default contract from there.
+3. Commit `contracts/deployments.json` and push.
 
-## 4. The mainnet Vercel project
+## 4. Switch the Vercel project to mainnet
 
-1. Create a new Vercel project from the same GitHub repo.
-2. Copy every variable from `.env.mainnet.example` and fill it in. Leave `AGENT_PRIVATE_KEY` and `REVIEW_WORKER_SECRET` unset.
-3. Fill in a local copy (`.env.mainnet.local`, which git ignores) and run:
+In Vercel → the project → Settings → Environment Variables (Production), set these, and delete the ones marked delete:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_ARC_CHAIN_ID` | `5042` |
+| `NEXT_PUBLIC_ARC_RPC` | `https://rpc.mainnet.arc.io` |
+| `NEXT_PUBLIC_ARC_EXPLORER` | `https://explorer.arc.io` |
+| `NEXT_PUBLIC_PPW_CONTRACT` | the address the deploy script printed |
+| `NEXT_PUBLIC_PPW_DEPLOY_BLOCK` | the block the deploy script printed |
+| `NEXT_PUBLIC_PPW_LEGACY_CONTRACTS` | `none` |
+| `NEXT_PUBLIC_USDC_ADDRESS` | `0x3600000000000000000000000000000000000000` (unchanged) |
+
+Leave everything else (Mongo, R2, secrets) as it is. `CONTENT_REVIEW`, `NEXT_PUBLIC_AGENT_API` and `NEXT_PUBLIC_DEPOSIT_CAP_USDC` default to off, off and $50 on mainnet. Only set them to override.
+
+Then, in order:
+1. Push `main` (the mainnet code), and redeploy so the new variables apply.
+2. Archive the testnet data in the shared database:
    ```
-   npx tsx scripts/mainnet-preflight.ts .env.mainnet.local
+   npx tsx scripts/migrate-contract.ts 0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1 --chain-switch
    ```
-   Every line must say PASS before you deploy.
-4. Deploy. Then run the same command with the site address added to also check the live site:
-   ```
-   npx tsx scripts/mainnet-preflight.ts .env.mainnet.local https://your-mainnet-domain
-   ```
+   This moves testnet receipts, agent purchases, watch progress, watch sessions and settlement history into `*_archive_0x9da4…` collections. Seconds paid with test USDC won't play free on mainnet. Videos, reviews and transcripts stay.
+3. Creators re-register their videos on mainnet from the dashboard (**Move all to the new contract**), which costs them a little USDC gas.
+4. Check the live site: `npx tsx scripts/mainnet-preflight.ts .env https://ppv-studio.vercel.app` (after updating `.env` to the mainnet values).
 
 ## 5. Scheduled jobs and monitoring
 
-- **Hourly settlement.** At cron-job.org, create a job that calls `GET https://your-mainnet-domain/api/cron/settle` every hour with the header `Authorization: Bearer <CRON_SECRET>`. (Vercel's built-in daily job also runs as a backup.)
-- **Health alerts.** Point an uptime monitor (UptimeRobot, Better Stack or cron-job.org) at `https://your-mainnet-domain/api/health` every 5–15 minutes with email alerts. It returns 503 when the settler is low on gas, the contract is paused, or no settlement has run for `HEALTH_MAX_SETTLE_HOURS`.
+- **Hourly settlement.** At cron-job.org, create a job that calls `GET https://ppv-studio.vercel.app/api/cron/settle` every hour with the header `Authorization: Bearer <CRON_SECRET>`. (Vercel's built-in daily job also runs as a backup.)
+- **Health alerts.** Point an uptime monitor (UptimeRobot, Better Stack or cron-job.org) at `https://ppv-studio.vercel.app/api/health` every 5–15 minutes with email alerts. It returns 503 when the settler is low on gas, the contract is paused, or no settlement has run for `HEALTH_MAX_SETTLE_HOURS`.
 
 ## 6. Legal
 

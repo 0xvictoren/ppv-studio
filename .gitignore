@@ -53,3 +53,4 @@ __pycache__/
 
 # Arc Studio CLI pull state
 .arc-studio/
+.next-mainnet/

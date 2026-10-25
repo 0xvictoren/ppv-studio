@@ -1,0 +1,2 @@
+contracts/src/*.sol text eol=lf
+contracts/artifacts/*.json text eol=lf

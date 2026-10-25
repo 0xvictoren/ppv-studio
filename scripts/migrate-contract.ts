@@ -16,6 +16,11 @@
  * `receipts_archive_<old>` / `agent_purchases_archive_<old>`.
  * File store: archives into $PPW_DATA_DIR/archive/.
  * Supabase: run `create table receipts_archive as select * from receipts; delete from receipts;`
+ *
+ * Moving to another chain (testnet -> mainnet): add --chain-switch (MongoDB only). Paid seconds,
+ * passes and downloads were bought with test USDC and must not play free on mainnet, and testnet
+ * earnings shouldn't show as real ones, so watch progress, watch sessions, settlement history,
+ * settle skips and HLS key grants are archived too. Videos, reviews and transcripts stay.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -30,6 +35,8 @@ for (const file of [".env.local", ".env"]) {
 }
 
 const old = (process.argv[2] ?? "").toLowerCase();
+const chainSwitch = process.argv.includes("--chain-switch");
+const COLLECTIONS = ["receipts", "agent_purchases", ...(chainSwitch ? ["watch_progress", "watch_sessions", "settlement_runs", "settle_skips", "hls_grants"] : [])];
 if (!/^0x[0-9a-f]{40}$/.test(old)) throw new Error("Pass the OLD contract address");
 const stamp = new Date().toISOString();
 
@@ -38,7 +45,7 @@ async function mongo(uri: string) {
   await client.connect();
   try {
     const db = client.db(process.env.MONGODB_DB || "payperwatch");
-    for (const name of ["receipts", "agent_purchases"]) {
+    for (const name of COLLECTIONS) {
       const docs = await db.collection(name).find({}).toArray();
       const archive = `${name}_archive_${old}`;
       if (docs.length) await db.collection(archive).insertMany(docs.map((d) => ({ ...d, archived_at: stamp })));
@@ -77,8 +84,9 @@ function files() {
 
 async function main() {
   if (process.env.MONGODB_URI) await mongo(process.env.MONGODB_URI);
+  else if (chainSwitch) throw new Error("--chain-switch needs MongoDB (MONGODB_URI)");
   else files();
-  console.log("Done. Videos, progress, passes, ratings, reviews and transcripts kept.");
+  console.log(chainSwitch ? "Done. Videos, reviews and transcripts kept." : "Done. Videos, progress, passes, ratings, reviews and transcripts kept.");
 }
 
 main().catch((e) => {

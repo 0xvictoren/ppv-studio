@@ -1,14 +1,14 @@
 /**
  * Read-only checks before (and right after) pointing a site at Arc mainnet. Sends no transactions.
- *   npx tsx scripts/mainnet-preflight.ts .env.mainnet.local [https://your-mainnet-site]
- * The env file holds the mainnet project's variables (see .env.mainnet.example). With a site URL it
+ *   npx tsx scripts/mainnet-preflight.ts .env [https://ppv-studio.vercel.app]
+ * The env file holds the site's variables with the mainnet values from MAINNET.md. With a site URL it
  * also checks the live deployment.
  */
 import { readFileSync } from "node:fs";
 import { createPublicClient, erc20Abi, formatUnits, getAddress, http, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-const [file = ".env.mainnet.local", site] = process.argv.slice(2);
+const [file = ".env", site] = process.argv.slice(2);
 for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
   if (m) process.env[m[1]] = m[2].replace(/^"(.*)"$/, "$1");
@@ -30,13 +30,13 @@ async function main() {
   check("not mock mode", e.NEXT_PUBLIC_MOCK_MODE !== "true");
   check("app URL is https", /^https:\/\//.test(e.NEXT_PUBLIC_APP_URL ?? ""), e.NEXT_PUBLIC_APP_URL);
   check("legacy contracts set explicitly (none on mainnet)", e.NEXT_PUBLIC_PPW_LEGACY_CONTRACTS !== undefined, e.NEXT_PUBLIC_PPW_LEGACY_CONTRACTS);
-  check("review worker muted (CONTENT_REVIEW=off)", e.CONTENT_REVIEW === "off", e.CONTENT_REVIEW);
-  check("agent API off", e.NEXT_PUBLIC_AGENT_API === "off", e.NEXT_PUBLIC_AGENT_API);
-  check("operator and contact set (terms, privacy, takedowns)", !!e.NEXT_PUBLIC_OPERATOR_NAME && /@/.test(e.NEXT_PUBLIC_CONTACT_EMAIL ?? ""));
-  check("mainnet database name", !!e.MONGODB_URI && !!e.MONGODB_DB && !/test/i.test(e.MONGODB_DB), e.MONGODB_DB);
+  check("review worker muted (CONTENT_REVIEW unset or off)", e.CONTENT_REVIEW !== "on", e.CONTENT_REVIEW ?? "unset");
+  check("agent API off (unset or off)", e.NEXT_PUBLIC_AGENT_API !== "on", e.NEXT_PUBLIC_AGENT_API ?? "unset");
+  if (!/@/.test(e.NEXT_PUBLIC_CONTACT_EMAIL ?? "")) warn("NEXT_PUBLIC_CONTACT_EMAIL not set: the pages use the built-in default");
+  check("database set", !!e.MONGODB_URI, e.MONGODB_DB);
   check("R2 bucket set", e.NEXT_PUBLIC_STORAGE_PROVIDER === "r2" && !!e.R2_BUCKET, e.R2_BUCKET);
   for (const k of ["SESSION_SECRET", "CRON_SECRET"]) check(`${k} is 32+ chars`, (e[k] ?? "").length >= 32);
-  if (!Number(e.NEXT_PUBLIC_DEPOSIT_CAP_USDC)) warn("no soft-launch deposit cap (NEXT_PUBLIC_DEPOSIT_CAP_USDC)");
+  if (e.NEXT_PUBLIC_DEPOSIT_CAP_USDC === "0") warn("soft-launch deposit cap turned off (NEXT_PUBLIC_DEPOSIT_CAP_USDC=0)");
 
   // Chain
   const rpc = e.NEXT_PUBLIC_ARC_RPC!;
@@ -73,8 +73,9 @@ async function main() {
       read<readonly [Hex, string, string, bigint, Address]>("eip712Domain"),
     ]);
     check("contract uses mainnet USDC", getAddress(token) === usdc, token);
-    check("owner is not the settler hot key", !settler || getAddress(owner) !== getAddress(settler), owner);
-    check("fee recipient is not the settler hot key", !settler || getAddress(feeRecipient) !== getAddress(settler), feeRecipient);
+    // Separate keys are safer, but the operator may choose one wallet for everything: warn, don't fail.
+    if (settler && getAddress(owner) === getAddress(settler)) warn("owner is the settler hot key: a server leak gives contract control", owner);
+    if (settler && getAddress(feeRecipient) === getAddress(settler)) warn("fee recipient is the settler hot key", feeRecipient);
     const ownerCode = (await client.getCode({ address: owner })) ?? "0x";
     if (ownerCode.length <= 2) warn("owner is a plain wallet, not a multisig. Fine if it's a hardware wallet", owner);
     check("platform fee 5%", Number(feeBps) === 500, feeBps);
