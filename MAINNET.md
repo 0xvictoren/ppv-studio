@@ -1,5 +1,11 @@
 # Going live on Arc mainnet
 
+> **Status: live since 2026-10-25.** Contract v4 is at
+> [`0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4`](https://explorer.arc.io/address/0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4)
+> (block 27732474), and https://ppv-studio.vercel.app runs on it. Steps 1–4 are done. The testnet data was archived
+> with `--chain-switch`. Sections 5–7 (scheduled jobs, legal review, soft launch) are ongoing. The steps below are
+> kept as the record of how the cutover was done.
+
 This is the checklist for running PayPerWatch with real USDC. Do the steps in order. Nothing here is automatic, and no step should be skipped because the testnet site works.
 
 **How it's set up (decided 2026-10-25):** the `main` branch is mainnet and runs on the existing Vercel project, MongoDB and R2 bucket. The `testnet` branch keeps the testnet version of the code. The current wallet (`0x85a5…8c98`, `SETTLER_PRIVATE_KEY`) is the contract owner, fee recipient and settler. That's simpler, but if the server key ever leaks, the attacker also controls the contract (pause, fees, withdrawal wait). Moving ownership to a hardware wallet later is one `transferOwnership` call plus `acceptOwnership`.

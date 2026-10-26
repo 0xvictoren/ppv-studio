@@ -380,7 +380,7 @@ console.log(data.answer.moments, data.answer.video.watchUrl);
 To try it from this repository:
 
 1. Run `npx tsx scripts/agent-demo.ts new` and put the key it prints into `.env.local` as `TEST_AGENT_PRIVATE_KEY`.
-2. Send that wallet test USDC from the faucet.
+2. Send that wallet a little USDC (test USDC from the faucet on testnet, or real USDC on Arc with `--mainnet`).
 3. Run `npx tsx scripts/agent-demo.ts deposit 1` to fund its Gateway balance.
 4. Run `npx tsx scripts/agent-demo.ts ask "how does private credit work onchain"`. Add `--mainnet` to use the live site with real USDC, and `--chain=base` to pay from a Gateway balance on another chain.
 

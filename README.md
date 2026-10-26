@@ -4,8 +4,15 @@
 Arc. Creators upload, choose a category and set a price per hour. Viewers connect their own wallet, deposit once and
 watch with no popups. Receipts are settled onchain every hour, and any site can embed it with one line.
 
-Runs on **Arc Testnet** against the deployed contract
-[`0x9da4…96e1`](https://explorer.testnet.arc.io/address/0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1) (v4).
+**Live on Arc mainnet** at https://ppv-studio.vercel.app since 2026-10-25, against the contract
+[`0xb5AE…1eF4`](https://explorer.arc.io/address/0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4) (v4, chain 5042, real USDC).
+It's a soft launch: deposits are capped at $50 per wallet, and the review worker (originality check, transcripts,
+encrypted streaming) and paid agent transcripts are off for now. See [MAINNET.md](MAINNET.md) for what differs and
+how the cutover was done.
+
+The testnet version of the code is on the `testnet` branch, against
+[`0x9da4…96e1`](https://explorer.testnet.arc.io/address/0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1) on Arc Testnet
+(chain 5042002). All addresses are in [`contracts/deployments.json`](contracts/deployments.json).
 
 ## Run it for real people (self-hosted, no third-party accounts)
 
@@ -17,9 +24,11 @@ npm run build && npm start      # http://localhost:3000
 
 - Videos are stored on disk in `./data/uploads` and metadata in `./data/ppw-db.json`. Back up `./data`.
 - The server settles receipts at the top of every hour (`instrumentation.ts`). The settler wallet needs a little
-  test USDC for gas: get it at https://faucet.circle.com (Arc Testnet).
-- Each person needs a browser wallet (MetaMask, Rabby, Coinbase Wallet) and test USDC from the same faucet. The app
-  adds Arc Testnet to the wallet automatically.
+  USDC on Arc for gas (a few dollars lasts months).
+- Each person needs a browser wallet (MetaMask, Rabby, Coinbase Wallet) and USDC on Arc. The app adds the Arc
+  network to the wallet automatically.
+- To run against Arc Testnet instead, use the `testnet` branch. Test USDC for the settler and viewers comes from
+  https://faucet.circle.com.
 - To let others in, put the server behind a public https URL (a VPS or a tunnel) and set `NEXT_PUBLIC_APP_URL` to
   it. Sign-in checks the domain, and https enables sign-in inside embeds.
 - Optional: `npm run seed` publishes 3 Creative Commons films from `SEED_CREATOR_PRIVATE_KEY`, so the catalog isn't
@@ -164,5 +173,9 @@ receipts to `data/archive/`, keeps videos, progress and passes), set the new add
 - View counts and minutes watched are reported by the client and used for analytics only. Money is governed by signed receipts and onchain caps.
 - The file store suits a single server. Use Supabase to run more than one instance.
 - Events are scanned from the RPC in 10k-block chunks with a short cache. A long-lived deployment should use an indexer.
-- Owner and fee recipient are the settler wallet in `.env.local` (`0x85a5…8c98`). Use a separate, hardware-held owner before mainnet.
+- Owner, fee recipient and settler are one wallet (`0x85a5…8c98`, `SETTLER_PRIVATE_KEY`), on mainnet too, by choice.
+  If that server key leaks, the attacker also controls the contract. Moving ownership to a hardware wallet is one
+  `transferOwnership` plus `acceptOwnership`.
+- The v4 contract was security-reviewed with Arc Studio (`contracts/docs/security-review-v4.md`), but hasn't had an
+  outside audit yet.
 - `NEXT_PUBLIC_MOCK_MODE=true` (a simulated chain) exists only for `scripts/e2e-mock.ts`.

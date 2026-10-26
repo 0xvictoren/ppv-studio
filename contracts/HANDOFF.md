@@ -2,7 +2,21 @@
 
 ## Deployed Contracts
 
-### v4 (CURRENT — use this)
+### v4 on Arc mainnet (LIVE — use this)
+| Field | Value |
+|---|---|
+| **Contract address** | `0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4` |
+| **Network** | Arc Mainnet |
+| **Chain ID** | `5042` |
+| **Deploy block** | `27732474` |
+| **Deploy tx hash** | `0x2374c2d023d33ee7ebda411549b5abf9e742253c6efdf511049e477b9caca237` |
+| **Explorer** | https://explorer.arc.io/address/0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4 |
+| **feeBps at deploy** | `500` (5%) |
+| **referralBps at deploy** | `500` (5% default, timelocked, owner-adjustable 0–10%) |
+| **withdrawDelay at deploy** | `86400` (24 hours, owner-adjustable 1h–7d) |
+| **feeRecipient / owner** | `0x85a5f7C46C86DD219757ec381dfDf2bB72Fa8c98` |
+
+### v4 on Arc Testnet (testnet branch)
 | Field | Value |
 |---|---|
 | **Contract address** | `0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1` |
@@ -66,8 +80,8 @@
 const domain = {
   name: "PayPerWatch",
   version: "4",                                               // bumped from v3
-  chainId: 5042002,                                          // 5042 for mainnet
-  verifyingContract: "0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1",
+  chainId: 5042,                                             // 5042002 on testnet
+  verifyingContract: "0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4", // testnet: 0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1
 } as const;
 ```
 
@@ -96,8 +110,8 @@ const signature = await walletClient.signTypedData({
   domain: {
     name: "PayPerWatch",
     version: "4",
-    chainId: 5042002n,
-    verifyingContract: "0x9da4403e212804081cd0d5bab0ea9d0bcc3d96e1",
+    chainId: 5042n,
+    verifyingContract: "0xb5AEE9b6421fdDAe63F31E5A7B2E4E4B54A51eF4",
   },
   types: {
     Receipt: [
