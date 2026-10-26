@@ -6,7 +6,7 @@ import { listVideos, type VideoRow } from "./db";
 // Each hit carries the transcript moments that matched, so a person or agent can jump to them.
 
 const STOP = new Set(
-  "the and for are but not you all any can had her was one our out see two way who did its let put say she too use that with have this will your from they know want been good much some time very when come here just like make many over such than them well were what into more only also then there these their would about could which other because how".split(
+  "the and for are but not you all any can had her was one our out see two way who did its let put say she too use that with have this will your from they know want been good much some time very when come here just like make many over such than them well were what into more only also then there these their would about could which other because how does do is are me my tell explain why where who whose please give show find video videos talk talks anything something someone".split(
     " ",
   ),
 );

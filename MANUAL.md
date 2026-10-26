@@ -347,32 +347,34 @@ Open **Developers** for ready-to-copy code and a live preview. Everything runs i
 
 AI agents can search everything said in PayPerWatch videos and buy full transcripts, paying in USDC through Circle Gateway nanopayments (the x402 standard). The creator is paid for every purchase, just like when a person watches.
 
-### The endpoint to give an agent
+### The one link to give an agent
 
 ```
-https://ppv-studio.vercel.app/api/agent/search?q=your+topic
+https://ppv-studio.vercel.app/api/agent/ask?q=your+question
 ```
 
-This is also on the **Developers** page, with a copy button.
+That's all an agent needs. It asks a question, pays a few cents in USDC from the wallet it already has, and gets the answer. There's no account, API key or sign-up. Agents that read `https://ppv-studio.vercel.app/llms.txt` can set themselves up from the site address alone. This is also on the **Developers** page, with a copy button and instructions to paste into an agent.
 
 ### How it works
 
-1. **Search (free).** `GET /api/agent/search?q=fibonacci+retracement&limit=10` returns matching videos with the moments in their transcripts that matched, and the price of each full transcript. It allows up to 30 searches a minute per IP and up to 12 search words.
-2. **Buy a transcript.** Each result has a `transcript.url`. Without payment, it returns `402 Payment Required` along with the payment details. Any x402 client with a Gateway balance on Arc pays and retries automatically.
-3. **What's included.** The full transcript with timestamps.
-4. **Price.** The same as watching the whole video: duration × price per hour.
+1. **Ask.** `GET /api/agent/ask?q=how+does+private+credit+work+onchain` (or `POST {"q": "..."}`).
+2. **Price.** The first reply is `402 Payment Required` with the price: what a person pays to watch the whole matching video, usually a few cents.
+3. **Pay.** Any x402 client with a Circle Gateway USDC balance pays and retries automatically. It can pay on any chain the 402 lists, such as Base, Ethereum, Arbitrum or Arc, so agents don't need to move money to Arc first. A Circle agent wallet works too (`circle services pay`).
+4. **Answer.** The full timestamped transcript of the best video, the moments that answer the question, a link to watch it, and other relevant videos.
+5. **Nothing relevant?** You get `404` and pay nothing.
+
+The free search (`GET /api/agent/search?q=...`) and single-transcript purchase (`GET /api/agent/videos/{id}/transcript`) still work for agents that want to choose for themselves.
 
 ### Example (TypeScript)
 
 ```
 import { GatewayClient } from "@circle-fin/x402-batching/client";
 
-const agent = new GatewayClient({ chain: "arcTestnet", privateKey: AGENT_KEY });
-await agent.deposit("1"); // once: fund the agent's Gateway balance
+// Any chain where the agent already holds a Circle Gateway balance.
+const agent = new GatewayClient({ chain: "base", privateKey: AGENT_KEY });
 
-const { results } = await (await fetch("https://ppv-studio.vercel.app/api/agent/search?q=fibonacci")).json();
-const { data } = await agent.pay(results[0].transcript.url);
-console.log(data.transcript);
+const { data } = await agent.pay("https://ppv-studio.vercel.app/api/agent/ask?q=" + encodeURIComponent(question));
+console.log(data.answer.moments, data.answer.video.watchUrl);
 ```
 
 To try it from this repository:
@@ -380,7 +382,7 @@ To try it from this repository:
 1. Run `npx tsx scripts/agent-demo.ts new` and put the key it prints into `.env.local` as `TEST_AGENT_PRIVATE_KEY`.
 2. Send that wallet test USDC from the faucet.
 3. Run `npx tsx scripts/agent-demo.ts deposit 1` to fund its Gateway balance.
-4. Run `npx tsx scripts/agent-demo.ts ask "fibonacci retracement"`.
+4. Run `npx tsx scripts/agent-demo.ts ask "how does private credit work onchain"`. Add `--mainnet` to use the live site with real USDC, and `--chain=base` to pay from a Gateway balance on another chain.
 
 <!-- end -->
 ## Running your own PayPerWatch

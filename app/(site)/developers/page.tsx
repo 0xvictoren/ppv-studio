@@ -36,15 +36,19 @@ export default function DevelopersPage() {
       code: `<iframe src="${host}/embed/watch/0xYOUR_VIDEO_ID"\n  style="width:100%;height:640px;border:0" allow="fullscreen; clipboard-write" allowfullscreen></iframe>`,
     },
   ];
-  const agentSearch = `${host}/api/agent/search?q=fibonacci+retracement`;
+  const agentAsk = `${host}/api/agent/ask?q=how+does+private+credit+work+onchain`;
+  const agentPrompt = `You can look things up on PayPerWatch, a library of creators' videos.
+For questions it might cover, call ${host}/api/agent/ask?q=<the question>
+with your x402 wallet. It answers 402 with a price of a few cents; pay it.
+Answer from answer.moments and answer.transcript, and link answer.video.watchUrl.
+A 404 means nothing matched and nothing was charged. Details: ${host}/llms.txt`;
   const agentPay = `import { GatewayClient } from "@circle-fin/x402-batching/client";
 
-const agent = new GatewayClient({ chain: "${isTestnet ? "arcTestnet" : "arc"}", privateKey: AGENT_KEY });
-await agent.deposit("1"); // once: fund the agent's Gateway balance
+// Any chain where your agent already holds a Circle Gateway balance.
+const agent = new GatewayClient({ chain: "${isTestnet ? "arcTestnet" : "base"}", privateKey: AGENT_KEY });
 
-const { results } = await (await fetch("${host}/api/agent/search?q=fibonacci")).json();
-const { data } = await agent.pay(results[0].transcript.url);
-console.log(data.transcript);`;
+const { data } = await agent.pay("${host}/api/agent/ask?q=" + encodeURIComponent(question));
+console.log(data.answer.moments, data.answer.video.watchUrl);`;
 
   return (
     <div className="container max-w-4xl">
@@ -92,17 +96,28 @@ console.log(data.transcript);`;
           For AI agents
         </h2>
         <p className="mt-2 text-[15px] text-muted-foreground">
-          Give your agent this endpoint. It can search every video for free, then buy a full timestamped transcript with USDC over x402 (Circle Gateway
-          nanopayments). The creator is paid for every purchase, just like a viewer.
+          Give your agent one link. It asks a question, pays a few cents in USDC over x402 from the wallet it already has, and gets the full timestamped
+          transcript of the video that answers it. No account and no API key. The creator is paid for every answer, just like for a viewer.
         </p>
-        <CopyCode code={agentSearch} className="mt-5" />
+        <CopyCode code={agentAsk} className="mt-5" />
         <div className="mt-10 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
           <div>
-            <h3 className="text-[17px] font-semibold">Buying a transcript</h3>
+            <h3 className="text-[17px] font-semibold">Tell your agent</h3>
             <p className="mt-2 text-[15px] text-muted-foreground">
-              Each search result has a <code className="text-foreground">transcript.url</code> and its price, which is what a person pays to watch the whole
-              video. Requesting it without payment returns <code className="text-foreground">402 Payment Required</code> with the payment details; any
-              x402 client with a Gateway balance on Arc pays and retries automatically.
+              Paste this into your agent&apos;s instructions. Agents that read <code className="text-foreground">{host}/llms.txt</code> can also set
+              themselves up from the site address alone.
+            </p>
+          </div>
+          <CopyCode code={agentPrompt} />
+        </div>
+        <div className="mt-10 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+          <div>
+            <h3 className="text-[17px] font-semibold">Paying</h3>
+            <p className="mt-2 text-[15px] text-muted-foreground">
+              The first request returns <code className="text-foreground">402 Payment Required</code> with the price: what a person pays to watch the whole
+              matching video. Any x402 client with a Circle Gateway USDC balance pays and retries automatically, on any chain the 402 lists, such as Base,
+              Ethereum, Arbitrum or Arc. A Circle agent wallet works too (<code className="text-foreground">circle services pay</code>). If nothing
+              matches, you get a 404 and pay nothing.
             </p>
           </div>
           <CopyCode code={agentPay} />

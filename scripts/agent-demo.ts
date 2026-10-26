@@ -6,7 +6,7 @@
  *   npx tsx scripts/agent-demo.ts                       # balances
  *   npx tsx scripts/agent-demo.ts new                   # print a fresh key for TEST_AGENT_PRIVATE_KEY
  *   npx tsx scripts/agent-demo.ts deposit 1             # $1: this wallet -> its Gateway balance (pays for transcripts)
- *   npx tsx scripts/agent-demo.ts ask "fibonacci retracement"
+ *   npx tsx scripts/agent-demo.ts ask "how does private credit work onchain"   # one call to /api/agent/ask
  *
  * PPW_URL picks the site (default NEXT_PUBLIC_APP_URL). Add --mainnet to use Arc mainnet and the live
  * site whatever .env says (real USDC).
@@ -24,17 +24,10 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
-type SearchResult = {
-  id: string;
-  title: string;
-  relevance: number;
-  moments: { start: number; end: number; text: string }[];
-  transcript: { url: string; price: string } | null;
-};
-type Transcript = {
-  video: { title: string; watchUrl: string };
-  transcript: string;
-  segments: { start: number; end: number; text: string }[];
+type Segment = { start: number; end: number; text: string };
+type Answer = {
+  answer: { video: { title: string; watchUrl: string }; moments: Segment[]; transcript: string; segments: Segment[] };
+  alsoRelevant: { title: string; transcript: { url: string; price: string } }[];
   payment: { amount: string; network: string; transaction: string | null };
 };
 
@@ -47,7 +40,8 @@ async function main() {
     process.env.NEXT_PUBLIC_ARC_RPC = "https://rpc.mainnet.arc.io";
     process.env.PPW_URL ||= "https://ppv-studio.vercel.app";
   }
-  const [cmd, arg] = process.argv.slice(2).filter((a) => a !== "--mainnet");
+  const chainArg = process.argv.find((a) => a.startsWith("--chain="))?.slice("--chain=".length);
+  const [cmd, arg] = process.argv.slice(2).filter((a) => a !== "--mainnet" && !a.startsWith("--chain="));
   if (cmd === "new") {
     const pk = generatePrivateKey();
     console.log(`TEST_AGENT_PRIVATE_KEY=${pk}\naddress: ${privateKeyToAccount(pk).address}`);
@@ -56,7 +50,8 @@ async function main() {
   const pk = process.env.TEST_AGENT_PRIVATE_KEY as Hex | undefined;
   if (!pk) throw new Error("Set TEST_AGENT_PRIVATE_KEY (create one with: npx tsx scripts/agent-demo.ts new)");
   const isTestnet = process.env.NEXT_PUBLIC_ARC_CHAIN_ID === "5042002";
-  const chain: SupportedChainName = isTestnet ? "arcTestnet" : "arc";
+  // --chain=base etc.: pay from a Gateway balance on another chain the 402 accepts.
+  const chain = (chainArg ?? (isTestnet ? "arcTestnet" : "arc")) as SupportedChainName;
   const gateway = new GatewayClient({ chain, privateKey: pk, rpcUrl: process.env.NEXT_PUBLIC_ARC_RPC });
   const site = (process.env.PPW_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
 
@@ -65,24 +60,23 @@ async function main() {
     const r = await gateway.deposit(arg);
     console.log(`deposited ${r.formattedAmount} USDC into Gateway  tx ${r.depositTxHash}`);
   } else if (cmd === "ask") {
-    if (!arg) throw new Error('Pass a question, e.g. ask "fibonacci retracement"');
-    console.log(`agent ${gateway.address} researching "${arg}" on ${site}\n`);
-
-    const res = await fetch(`${site}/api/agent/search?q=${encodeURIComponent(arg)}&limit=5`);
-    if (!res.ok) throw new Error(`search failed: ${res.status} ${await res.text()}`);
-    const { results } = (await res.json()) as { results: SearchResult[] };
-    for (const r of results) console.log(`  ${r.relevance.toFixed(2).padStart(6)}  ${r.title}  ${r.transcript ? r.transcript.price : "(no transcript yet)"}`);
-    const pick = results.find((r) => r.transcript);
-    if (!pick) return console.log("\nnothing for sale on this topic yet");
-
-    console.log(`\nbuying the transcript of "${pick.title}" for ${pick.transcript!.price} ...`);
-    const paid = await gateway.pay<Transcript>(pick.transcript!.url);
-    const t = paid.data;
-    console.log(`paid ${paid.formattedAmount} USDC on ${t.payment.network}  settlement ${paid.transaction || "(batched)"}`);
-    console.log(`got ${t.segments.length} timestamped segments, ${t.transcript.length} characters\n`);
-    for (const s of t.segments.slice(0, 8)) console.log(`  [${clock(s.start)}] ${s.text}`);
-    if (t.segments.length > 8) console.log(`  ... ${t.segments.length - 8} more`);
-    console.log(`\nsource: ${t.video.watchUrl}`);
+    if (!arg) throw new Error('Pass a question, e.g. ask "how does private credit work onchain"');
+    // The one-link flow an outside agent uses: ask, get a 402 with the price, pay, read the answer.
+    console.log(`agent ${gateway.address} asking ${site}/api/agent/ask: "${arg}"
+`);
+    const url = `${site}/api/agent/ask?q=${encodeURIComponent(arg)}`;
+    const probe = await fetch(url);
+    if (probe.status === 404) return console.log("nothing on PayPerWatch covers this yet (not charged)");
+    if (probe.status !== 402) throw new Error(`ask failed: ${probe.status} ${await probe.text()}`);
+    const paid = await gateway.pay<Answer>(url);
+    const { answer, alsoRelevant, payment } = paid.data;
+    console.log(`paid ${paid.formattedAmount} USDC on ${payment.network}  settlement ${paid.transaction || "(batched)"}`);
+    console.log(`answer from "${answer.video.title}" (${answer.segments.length} segments)
+`);
+    for (const m of answer.moments) console.log(`  [${clock(m.start)}] ${m.text}`);
+    console.log(`
+source: ${answer.video.watchUrl}`);
+    for (const r of alsoRelevant) console.log(`also relevant: ${r.title}  ${r.transcript.price}`);
   }
 
   const b = await gateway.getBalances();
