@@ -6,6 +6,7 @@
  *   npx tsx scripts/agent-demo.ts                       # balances
  *   npx tsx scripts/agent-demo.ts new                   # print a fresh key for TEST_AGENT_PRIVATE_KEY
  *   npx tsx scripts/agent-demo.ts deposit 1             # $1: this wallet -> its Gateway balance (pays for transcripts)
+ *   npx tsx scripts/agent-demo.ts withdraw 0.5          # Gateway balance -> back to this wallet
  *   npx tsx scripts/agent-demo.ts ask "how does private credit work onchain"   # one call to /api/agent/ask
  *
  * PPW_URL picks the site (default NEXT_PUBLIC_APP_URL). Add --mainnet to use Arc mainnet and the live
@@ -59,6 +60,11 @@ async function main() {
     if (!arg) throw new Error("Pass an amount in USDC, e.g. deposit 1");
     const r = await gateway.deposit(arg);
     console.log(`deposited ${r.formattedAmount} USDC into Gateway  tx ${r.depositTxHash}`);
+  } else if (cmd === "withdraw") {
+    // Gateway balance -> this wallet's USDC on the same chain.
+    if (!arg) throw new Error("Pass an amount in USDC, e.g. withdraw 0.5");
+    const r = await gateway.withdraw(arg, { chain });
+    console.log("withdrawn from Gateway:", r);
   } else if (cmd === "ask") {
     if (!arg) throw new Error('Pass a question, e.g. ask "how does private credit work onchain"');
     // The one-link flow an outside agent uses: ask, get a 402 with the price, pay, read the answer.
