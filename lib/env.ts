@@ -36,8 +36,8 @@ function flag(v: string | undefined, fallback: boolean) {
 }
 
 /**
- * Paid transcripts for AI agents (Circle Gateway nanopayments). Gateway doesn't support
- * nanopayments on Arc mainnet yet, and transcripts come from the review worker, so this
+ * Paid transcripts for AI agents (x402 over Circle Gateway nanopayments, which supports Arc mainnet,
+ * eip155:5042). Transcripts come from the review worker, which isn't running on mainnet yet, so this
  * defaults to testnet only. NEXT_PUBLIC_AGENT_API=on|off overrides.
  */
 export const agentApiEnabled = flag(process.env.NEXT_PUBLIC_AGENT_API, isTestnet);

@@ -10,7 +10,7 @@ This is the checklist for running PayPerWatch with real USDC. Do the steps in or
 |---|---|---|
 | Network | Arc Testnet (5042002) | Arc (5042), USDC `0x3600…0000`, 6 decimals |
 | Review worker (originality check, transcripts, encrypted streaming) | On | **Off** (`CONTENT_REVIEW=off`) until a worker runs around the clock |
-| Paid agent transcripts | On | **Off** (`NEXT_PUBLIC_AGENT_API=off`): Circle Gateway nanopayments aren't on Arc mainnet yet, and there are no transcripts while the worker is off |
+| Paid agent transcripts | On | **Off by default** (`NEXT_PUBLIC_AGENT_API=on` to enable). Circle Gateway x402 supports Arc mainnet (`eip155:5042`, checked 2026-10-26), but new transcripts need the review worker |
 | Deposit limit | None | $50 per wallet while soft-launching (`NEXT_PUBLIC_DEPOSIT_CAP_USDC`), enforced in the app |
 | Contract owner | `0x85a5…8c98` | The same wallet, by choice (see above) |
 | Settlement sweep | Daily (Vercel cron) | Hourly (cron-job.org) |
@@ -93,4 +93,4 @@ When there's a machine that stays on (a small VPS with ffmpeg):
 1. Set a new `REVIEW_WORKER_SECRET` and `CONTENT_REVIEW=on` in the mainnet project, then redeploy.
 2. Start `python worker/review_worker.py` on that machine with the mainnet site address and secret.
 3. Existing videos are transcribed and packaged for encrypted streaming as the worker catches up.
-4. Paid agent transcripts can follow once Circle Gateway supports nanopayments on Arc mainnet: `NEXT_PUBLIC_AGENT_API=on` plus a new `AGENT_PRIVATE_KEY`.
+4. Turn paid agent transcripts on with `NEXT_PUBLIC_AGENT_API=on` (needs `AGENT_PRIVATE_KEY`, and a USDC balance for that account in the PayPerWatch contract so creators get paid).

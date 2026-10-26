@@ -8,7 +8,8 @@
  *   npx tsx scripts/agent-demo.ts deposit 1             # $1: this wallet -> its Gateway balance (pays for transcripts)
  *   npx tsx scripts/agent-demo.ts ask "fibonacci retracement"
  *
- * PPW_URL picks the site (default NEXT_PUBLIC_APP_URL).
+ * PPW_URL picks the site (default NEXT_PUBLIC_APP_URL). Add --mainnet to use Arc mainnet and the live
+ * site whatever .env says (real USDC).
  */
 import { GatewayClient, type SupportedChainName } from "@circle-fin/x402-batching/client";
 import { existsSync, readFileSync } from "node:fs";
@@ -40,7 +41,13 @@ type Transcript = {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 async function main() {
-  const [cmd, arg] = process.argv.slice(2);
+  const mainnet = process.argv.includes("--mainnet");
+  if (mainnet) {
+    process.env.NEXT_PUBLIC_ARC_CHAIN_ID = "5042";
+    process.env.NEXT_PUBLIC_ARC_RPC = "https://rpc.mainnet.arc.io";
+    process.env.PPW_URL ||= "https://ppv-studio.vercel.app";
+  }
+  const [cmd, arg] = process.argv.slice(2).filter((a) => a !== "--mainnet");
   if (cmd === "new") {
     const pk = generatePrivateKey();
     console.log(`TEST_AGENT_PRIVATE_KEY=${pk}\naddress: ${privateKeyToAccount(pk).address}`);
